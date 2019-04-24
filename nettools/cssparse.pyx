@@ -63,21 +63,25 @@ cdef class CSSAttribute:
         return attribute
 
 
+cdef char_is_hex(v):
+    v = v.lower()
+    return (ord(v) >= ord("a") and ord(v) <= ord("f")) or\
+        (ord(v) >= ord("0") and ord(v) <= ord("9"))
+
+
+cdef is_hex(v):
+    if len(v) == 0:
+        return False
+    i = 0
+    while i < len(v):
+        if not char_is_hex(v[i]):
+            return False
+        i += 1
+    return True
+
+
 cpdef parse_css_color(color):
     color = color.lower()
-    def is_hex(v):
-        def char_is_hex(v):
-            v = v.lower()
-            return (ord(v) >= ord("a") and ord(v) <= ord("f")) or\
-                (ord(v) >= ord("0") and ord(v) <= ord("9"))
-        if len(v) == 0:
-            return False
-        i = 0
-        while i < len(v):
-            if not char_is_hex(v[i]):
-                return False
-            i += 1
-        return True
     if color == "red":
         return "#ff0000"
     elif color == "green":
