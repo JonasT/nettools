@@ -22,7 +22,7 @@ freely, subject to the following restrictions:
 import html.parser
 
 
-cdef int SELECTOR_DEBUG = True
+cdef int SELECTOR_DEBUG = False
 
 
 cpdef enable_selector_debugging():
