@@ -30,7 +30,9 @@ cpdef enable_selector_debugging():
     SELECTOR_DEBUG = True
 
 
-class CSSAttribute(object):
+cdef class CSSAttribute:
+    cdef public str name, value
+
     def __init__(self, name, value):
         self.name = name.strip()
         self.value = value.strip()
@@ -285,7 +287,7 @@ cdef class CSSRule:
 
 
 cdef class CSSRulesetCollection:
-    cdef public list rules
+    """ Members are in cssparse.pxd """
 
     def __init__(self):
         self.rules = []

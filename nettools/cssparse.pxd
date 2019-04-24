@@ -18,5 +18,14 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 '''
 
+cdef class CSSRulesetCollection:
+    cdef public list rules
+
+
 cpdef enable_selector_debugging()
 
+
+cpdef CSSRulesetCollection parse_inline(str css)
+
+
+cpdef CSSRulesetCollection parse(str css)
