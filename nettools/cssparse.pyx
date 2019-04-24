@@ -63,7 +63,7 @@ cdef class CSSAttribute:
         return attribute
 
 
-def parse_css_color(color):
+cpdef parse_css_color(color):
     color = color.lower()
     def is_hex(v):
         def char_is_hex(v):
