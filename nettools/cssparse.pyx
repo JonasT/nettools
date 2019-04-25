@@ -93,7 +93,7 @@ cpdef parse_css_color(color):
         return "#00ff00"
     elif color == "blue":
         return "#0000ff"
-    elif color == "gray":
+    elif color == "gray" or color == "grey":
         return "#777777"
     elif color == "orange":
         return "#ffee00"
@@ -101,6 +101,8 @@ cpdef parse_css_color(color):
         return "#ffffff"
     elif color == "black":
         return "#000000"
+    elif color == "pink":
+        return "#ff00aa"
     elif len(color) == 4 and color[0] == "#" and \
             is_hex(color[1:]):
         return "#" + color[1] + color[1] +\
@@ -368,10 +370,10 @@ cdef class CSSRulesetCollection:
                                   "   (more specific rule: " +
                                   str(old_rule) + ")")
         result = {v[0].name: v[0] for v in result_attributes.values()}
-        if SELECTOR_DEBUG:
-            print("nettools.cssparse.CSSRulesetCollection: " +
-                  "DEBUG: ruleset attributes result: " +
-                  str(result))
+        #if SELECTOR_DEBUG:
+        #    print("nettools.cssparse.CSSRulesetCollection: " +
+        #          "DEBUG: ruleset attributes result: " +
+        #          str(result))
         return result
 
 
