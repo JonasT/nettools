@@ -168,14 +168,23 @@ cdef class CSSSelector:
                 )
             return True
         selector_item_name = item_selector
-        selector_item_class = ""
+        selector_item_classes = []
         selector_item_id = ""
-        if selector_item_name.find(".") > 0:
-            selector_item_id = selector_item_name.rpartition(".")[2]
+        print(str((selector_item_name, selector_item_classes, selector_item_id)))
+        while selector_item_name.find(".") >= 0:
+            new_class_str = selector_item_name.rpartition(".")[2]
             selector_item_name = selector_item_name.rpartition(".")[0]
-        if selector_item_name.find("#") > 0:
-            selector_item_class = selector_item_name.rpartition("#")[2]
+            if new_class_str.find("#") > 0:
+                selector_name += new_class_str.partition("#")[2]
+                new_class_str = new_class_str.partition("#")[0]
+            selector_item_classes += [
+                c.strip() for c in new_class_str.split(".")
+                if len(c.strip()) > 0
+            ]
+        if selector_item_name.find("#") >= 0:
+            selector_item_id = selector_item_name.rpartition("#")[2]
             selector_item_name = selector_item_name.rpartition("#")[0]
+        print(str((selector_item_name, selector_item_classes, selector_item_id)))
 
         if len(selector_item_name) > 0 and item_name != selector_item_name:
             if SELECTOR_DEBUG:
@@ -185,8 +194,8 @@ cdef class CSSSelector:
                       " -> False"
                 )
             return False
-        if len(selector_item_class) > 0 and \
-                not set(item_classes).intersection(selector_item_class):
+        if len(selector_item_classes) > 0 and \
+                not set(item_classes).intersection(selector_item_classes):
             if SELECTOR_DEBUG:
                 print("nettools.cssparse.CSSSelector: " +
                       "DEBUG: check_item" +

@@ -59,6 +59,20 @@ def test_parse():
     assert(len(result.rules[1].attributes) == 2)
 
 
+def test_cssselector_check_item():
+    cssparse.enable_selector_debugging()
+
+    assert(cssparse.CSSSelector.check_item(
+        "*", "bla"
+    ) is True)
+    assert(cssparse.CSSSelector.check_item(
+        ".test", "bla"
+    ) is False)
+    assert(cssparse.CSSSelector.check_item(
+        ".test", "bla", item_classes=["test"]
+    ) is True)
+
+
 def test_complex_selector_scenarios():
     cssparse.enable_selector_debugging()
 
