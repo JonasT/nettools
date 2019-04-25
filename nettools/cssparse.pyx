@@ -170,7 +170,6 @@ cdef class CSSSelector:
         selector_item_name = item_selector
         selector_item_classes = []
         selector_item_id = ""
-        print(str((selector_item_name, selector_item_classes, selector_item_id)))
         while selector_item_name.find(".") >= 0:
             new_class_str = selector_item_name.rpartition(".")[2]
             selector_item_name = selector_item_name.rpartition(".")[0]
@@ -184,7 +183,6 @@ cdef class CSSSelector:
         if selector_item_name.find("#") >= 0:
             selector_item_id = selector_item_name.rpartition("#")[2]
             selector_item_name = selector_item_name.rpartition("#")[0]
-        print(str((selector_item_name, selector_item_classes, selector_item_id)))
 
         if len(selector_item_name) > 0 and item_name != selector_item_name:
             if SELECTOR_DEBUG:
@@ -194,15 +192,17 @@ cdef class CSSSelector:
                       " -> False"
                 )
             return False
-        if len(selector_item_classes) > 0 and \
-                not set(item_classes).intersection(selector_item_classes):
-            if SELECTOR_DEBUG:
-                print("nettools.cssparse.CSSSelector: " +
-                      "DEBUG: check_item" +
-                      str((item_selector, item_name, item_classes, item_id)) +
-                      " -> False"
-                )
-            return False
+        if len(selector_item_classes) > 0:
+            for required_class in selector_item_classes:
+                if required_class not in item_classes:
+                    if SELECTOR_DEBUG:
+                        print("nettools.cssparse.CSSSelector: " +
+                              "DEBUG: check_item" +
+                              str((item_selector, item_name, item_classes,
+                                   item_id)) +
+                              " -> False"
+                        )
+                    return False
         if len(selector_item_id) > 0 and item_id != selector_item_id:
             if SELECTOR_DEBUG:
                 print("nettools.cssparse.CSSSelector: " +
