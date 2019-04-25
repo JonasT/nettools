@@ -30,6 +30,11 @@ cpdef enable_selector_debugging():
     SELECTOR_DEBUG = True
 
 
+cpdef disable_selector_debugging():
+    global SELECTOR_DEBUG
+    SELECTOR_DEBUG = False
+
+
 cdef class CSSAttribute:
     cdef public str name, value
 

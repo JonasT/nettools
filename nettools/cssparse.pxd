@@ -25,6 +25,9 @@ cdef class CSSRulesetCollection:
 cpdef enable_selector_debugging()
 
 
+cpdef disable_selector_debugging()
+
+
 cpdef CSSRulesetCollection parse_inline(str css)
 
 
