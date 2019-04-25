@@ -516,15 +516,22 @@ cpdef CSSRulesetCollection parse(str css):
     cdef list rule_strings = extract_rule_strings(css)
     for rule_str in rule_strings:
         rule_str = rule_str.strip()
-        rule_selector = rule_str.partition("{")[0].strip()
+        rule_selector_str = rule_str.partition("{")[0].strip()
         rule_contents = rule_str.partition("{")[2].strip()
         if rule_contents.endswith("}"):
             rule_contents = rule_contents[:-1].strip()
-        if len(rule_selector) == 0 or len(rule_contents) == 0:
+        if len(rule_selector_str) == 0 or len(rule_contents) == 0:
             continue
         attributes = parse_css_inline_attributes(rule_contents)
         if len(attributes) == 0:
             continue
-        result.rules.append(CSSRule(selector_str=rule_selector,
-                                    attributes=attributes))
+        rule_selectors = [
+            c.strip() for c in rule_selector_str.split(",")
+            if len(c.strip()) > 0
+        ]
+        for rule_selector in rule_selectors:
+            result.rules.append(CSSRule(
+                selector_str=rule_selector,
+                attributes=attributes
+            ))
     return result

@@ -77,6 +77,10 @@ def test_cssselector_check_item():
     assert(cssparse.CSSSelector.check_item(
         ".test", "bla", item_classes=["test2", "test"]
     ) is True)
+    assert(cssparse.CSSSelector.check_item(
+        "myitem.test1.test2", "myitem",
+        item_classes=["test1", "test2", "test3"]
+    ) is True)
 
 def test_complex_selector_scenarios():
     cssparse.enable_selector_debugging()
