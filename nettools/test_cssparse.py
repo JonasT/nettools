@@ -26,6 +26,7 @@ sys.path = [os.path.abspath(os.path.join(
 
 import nettools.cssparse as cssparse
 
+
 def test_extract_string_without_comments():
     result = cssparse.extract_string_without_comments(
         "abc /*def*/ flu {value:'/*test'}"
@@ -82,6 +83,7 @@ def test_cssselector_check_item():
         item_classes=["test1", "test2", "test3"]
     ) is True)
 
+
 def test_complex_selector_scenarios():
     cssparse.enable_selector_debugging()
 
@@ -110,3 +112,40 @@ def test_complex_selector_scenarios():
     assert(set(attributes.keys()) == {"height", "padding"})
     assert(attributes["height"].value == "15px")
     assert(attributes["padding"].value == "5px")
+
+
+def test_directional_fallback_to_nondirectional():
+    cssparse.enable_selector_debugging()
+
+    result = cssparse.parse("""
+        * {padding-left:5px}
+        body {padding:10px;}
+    """)
+    attributes = result.get_item_attributes(
+        "body", nondirectional_can_override_directional=True
+    )
+    assert("padding" in attributes)
+    if "padding-left" in attributes:
+        assert(attributes["padding-left"].value == "10px")
+    else:
+        assert(attributes["padding"].value == "10px")
+
+    print("*****************")
+    result = cssparse.parse("""
+        * {padding-left:5px}
+        body {padding:10px;padding-left:3px;}
+    """)
+    attributes = result.get_item_attributes(
+        "body", nondirectional_can_override_directional=True
+    )
+    assert(set(attributes.keys()) == {"padding", "padding-left"})
+    assert(attributes["padding-left"].value == "3px")
+
+    result = cssparse.parse("""
+        * {padding-left:5px}
+        body {padding:10px;}
+    """)
+    attributes = result.get_item_attributes(
+        "body", nondirectional_can_override_directional=False
+    )
+    assert(attributes["padding-left"].value == "5px")

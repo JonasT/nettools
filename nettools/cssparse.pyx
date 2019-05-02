@@ -326,7 +326,10 @@ cdef class CSSRulesetCollection:
     def get_item_attributes(self,
                             str item_name,
                             list item_classes=[], str item_id="",
-                            object get_next_parent_info=None):
+                            object get_next_parent_info=None,
+                            int nondirectional_can_override_directional=True,
+                           ):
+        directionals = ("-left", "-right", "-top", "-bottom")
         item_classes = list(item_classes)
         cdef dict result_attributes = {}
         cdef int rule_id = -1
@@ -338,37 +341,86 @@ cdef class CSSRulesetCollection:
                                     get_next_parent_info=
                                         get_next_parent_info
                                     ):
-                if SELECTOR_DEBUG:
-                    print("nettools.cssparse.CSSRulesetCollection: " +
-                          "DEBUG: rule's applies_to_item" +
-                          str((item_name, item_classes, item_id,
-                               get_next_parent_info)) +
-                          "=True, rule=" + str(rule))
                 for attr in rule.attributes:
-                    if not attr.name in result_attributes:
-                        if SELECTOR_DEBUG:
-                            print("nettools.cssparse.CSSRulesetCollection: " +
-                                  "DEBUG: rule sets NEW attribute: " +
-                                  str(attr.name) + "='" +
-                                  str(attr.value) + "'")
-                        result_attributes[attr.name] = (attr, rule)
+                    if SELECTOR_DEBUG:
+                        print("nettools.cssparse.CSSRulesetCollection: " +
+                              "DEBUG: rule's applies_to_item" +
+                              str((item_name, item_classes, item_id,
+                                   get_next_parent_info)) +
+                              "=True, rule=" + str(rule))
+
+                    # Collect all the attributes that could clash with this:
+                    clashing_attributes = []
+                    if attr.name in result_attributes and \
+                            result_attributes[attr.name][1] != rule:
+                        clashing_attributes.append(
+                            result_attributes[attr.name]
+                        )
+                    if nondirectional_can_override_directional and \
+                            attr.name.endswith(directionals) and \
+                            attr.name.rpartition("-")[0] in \
+                                result_attributes and \
+                            result_attributes[
+                                attr.name.rpartition("-")[0]
+                            ][1] != rule:
+                        clashing_attributes.append(result_attributes[
+                            attr.name.rpartition("-")[0]
+                        ])
+                    if nondirectional_can_override_directional and \
+                            not attr.name.endswith(directionals) and \
+                            len([attr.name + d for d in directionals
+                                 if attr.name + d in result_attributes]) > 0:
+                        for d in directionals:
+                            if attr.name + d in result_attributes and \
+                                    result_attributes[
+                                        attr.name + d
+                                    ][1] != rule:
+                                clashing_attributes.append(result_attributes[
+                                    attr.name + d
+                                ])
+
+                    # Bail out of setting this attribute if it's overridden:
+                    must_be_ignored = False
+                    for (old_attr, old_rule) in clashing_attributes:
+                        if rule != old_rule and not \
+                                rule.trumps_other_rule(old_rule):
+                            if SELECTOR_DEBUG:
+                                print("nettools.cssparse." +
+                                      "CSSRulesetCollection: " +
+                                      "DEBUG: rule sets IGNORED attribute: " +
+                                      str(attr.name) + "='" +
+                                      str(attr.value) +
+                                      "'   (we already got more " +
+                                      "specific rule: " +
+                                      str(old_rule) + "/attribute " +
+                                      str(old_attr) + ")")
+                            must_be_ignored = True
+                            break
+                    if must_be_ignored:
                         continue
-                    (old_attr, old_rule) = result_attributes[attr.name]
-                    if rule.trumps_other_rule(old_rule):
-                        if SELECTOR_DEBUG:
-                            print("nettools.cssparse.CSSRulesetCollection: " +
-                                  "DEBUG: rule sets OVERRIDING attribute: " +
-                                  str(attr.name) + "='" + str(attr.value) +
-                                  "'   (overridden less specific rule: " +
-                                  str(old_rule) + ")")
-                        result_attributes[attr.name] = (attr, rule)
-                    else:
-                        if SELECTOR_DEBUG:
-                            print("nettools.cssparse.CSSRulesetCollection: " +
-                                  "DEBUG: rule sets IGNORED attribute: " +
-                                  str(attr.name) +
-                                  "   (more specific rule: " +
-                                  str(old_rule) + ")")
+
+                    # Debug-announce we'll set the attribute:
+                    if SELECTOR_DEBUG and len(clashing_attributes) > 0:
+                        print("nettools.cssparse.CSSRulesetCollection: " +
+                              "DEBUG: rule sets OVERRIDING attribute: " +
+                              str(attr.name) + "='" +
+                              str(attr.value) + "'   (overrides " +
+                              str([(c[0].name, c[1]) for c in
+                                   clashing_attributes]) + ")")
+                    elif SELECTOR_DEBUG:
+                        print("nettools.cssparse.CSSRulesetCollection: " +
+                              "DEBUG: rule sets NEW attribute: " +
+                              str(attr.name) + "='" +
+                              str(attr.value) + "'")
+                    # Set actual new value:
+                    result_attributes[attr.name] = (attr, rule)
+
+                    # Make sure overriden values, if any, are removed:
+                    for c in clashing_attributes:
+                        if c[0].name != attr.name and \
+                                c[0].name in result_attributes:
+                            del(result_attributes[c[0].name])
+
         result = {v[0].name: v[0] for v in result_attributes.values()}
         #if SELECTOR_DEBUG:
         #    print("nettools.cssparse.CSSRulesetCollection: " +
