@@ -31,3 +31,5 @@ cpdef str linkify_html(str html_text, int linkify_with_blank_target=*)
 cpdef depth_first_walker(html, callback, visit_out_callback=*)
 
 cpdef str remove_html_comments(str t)
+
+cpdef str html_escape(t)
