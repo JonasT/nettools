@@ -38,3 +38,6 @@ cpdef parse_css_color(color)
 
 
 cpdef parse_css_inline_attributes(str css_string)
+
+
+cpdef str extract_string_without_comments(str string)
