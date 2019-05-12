@@ -35,3 +35,6 @@ cpdef CSSRulesetCollection parse(str css)
 
 
 cpdef parse_css_color(color)
+
+
+cpdef parse_css_inline_attributes(str css_string)

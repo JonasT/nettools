@@ -507,9 +507,9 @@ cpdef list extract_rule_strings(str string):
     return rules
 
 
-def parse_css_inline_attributes(css_string):
+cpdef parse_css_inline_attributes(str css_string):
     fragments = []
-    i = 0
+    cdef int i = 0
     current_item_start = 0
     bracket_nesting = 0
     backslash_quoted = False
