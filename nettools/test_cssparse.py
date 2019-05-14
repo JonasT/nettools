@@ -47,6 +47,27 @@ def test_extract_rule_strings():
     assert(result[1] == "myrule2{b:2}")
 
 
+def test_attribute_priorities():
+    result = cssparse.parse("""
+        * {border-style:solid;}
+        body {border:1px solid red;border-width:2px;}
+    """)
+    result = result.get_item_attributes(
+        "body", nondirectional_can_override_directional=True
+    )
+    attributes = result.attributes
+    attribute_priorities = result.priorities
+    assert(set(attributes.keys()) == {
+        "border", "border-style", "border-width"
+    })
+    assert(attribute_priorities["border"] ==
+           attribute_priorities["border-width"])
+    assert(attribute_priorities["border-style"] <
+           attribute_priorities["border"])
+    assert(attribute_priorities["border-style"] <
+           attribute_priorities["border-width"])
+
+
 def test_parse():
     result = cssparse.parse("""
         * {padding:5px}
@@ -91,7 +112,7 @@ def test_complex_selector_scenarios():
         * {padding:5px}
         body {height:15px; padding:10px;}
     """)
-    attributes = result.get_item_attributes("body")
+    attributes = result.get_item_attributes("body").attributes
     assert(set(attributes.keys()) == {"height", "padding"})
     assert(attributes["height"].value == "15px")
 
@@ -99,7 +120,7 @@ def test_complex_selector_scenarios():
         body {height:15px; padding:10px;}
         * {padding:5px}
     """)
-    attributes = result.get_item_attributes("body")
+    attributes = result.get_item_attributes("body").attributes
     assert(set(attributes.keys()) == {"height", "padding"})
     assert(attributes["height"].value == "15px")
     assert(attributes["padding"].value == "10px")
@@ -108,7 +129,7 @@ def test_complex_selector_scenarios():
         body {height:15px; padding:10px;}
         body {padding:5px}
     """)
-    attributes = result.get_item_attributes("body")
+    attributes = result.get_item_attributes("body").attributes
     assert(set(attributes.keys()) == {"height", "padding"})
     assert(attributes["height"].value == "15px")
     assert(attributes["padding"].value == "5px")
@@ -123,7 +144,7 @@ def test_directional_fallback_to_nondirectional():
     """)
     attributes = result.get_item_attributes(
         "body", nondirectional_can_override_directional=True
-    )
+    ).attributes
     assert("padding" in attributes)
     if "padding-left" in attributes:
         assert(attributes["padding-left"].value == "10px")
@@ -137,7 +158,7 @@ def test_directional_fallback_to_nondirectional():
     """)
     attributes = result.get_item_attributes(
         "body", nondirectional_can_override_directional=True
-    )
+    ).attributes
     assert(set(attributes.keys()) == {"padding", "padding-left"})
     assert(attributes["padding-left"].value == "3px")
 
@@ -147,5 +168,5 @@ def test_directional_fallback_to_nondirectional():
     """)
     attributes = result.get_item_attributes(
         "body", nondirectional_can_override_directional=False
-    )
+    ).attributes
     assert(attributes["padding-left"].value == "5px")

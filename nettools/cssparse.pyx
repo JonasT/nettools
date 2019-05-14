@@ -129,14 +129,14 @@ cdef class CSSSelector:
         for item in self.items:
             if item == ">" or item == "*":
                 continue
-            self._specificity += self.get_item_specifity(item)
+            self._specificity += self.get_item_specificity(item)
 
     @property
     def specificity(self):
         return self._specificity
 
     @classmethod
-    def get_item_specifity(cls, item):
+    def get_item_specificity(cls, item):
         cdef int specificity_count = 1
         if item.find("]") > 0:
             specificity_count += 10
@@ -254,9 +254,11 @@ cdef class CSSRule:
         )
 
     def trumps_other_rule(self, rule):
-        if self.selector.specificity == rule.selector.specificity:
-            return (self.occurrence_order > rule.occurrence_order)
-        return self.selector.specificity > rule.selector.specificity
+        return (self.get_sorting_id() > rule.get_sorting_id())
+
+    def get_sorting_id(self):
+        return int(self.occurrence_order) +\
+            int(self.selector.specificity) * 10000000
 
     def applies_to_item(self,
             str item_name,
@@ -314,6 +316,15 @@ cdef class CSSRule:
         return True
 
 
+cdef class CSSAttributeQueryResult:
+    cdef public dict attributes
+    cdef public dict priorities
+
+    def __init__(self, attributes, rule_priorities):
+        self.attributes = attributes
+        self.priorities = rule_priorities
+
+
 cdef class CSSRulesetCollection:
     """ Members are in cssparse.pxd """
 
@@ -324,11 +335,11 @@ cdef class CSSRulesetCollection:
         return "<CSSRuleCollection" + str(self.rules) + ">"
 
     def get_item_attributes(self,
-                            str item_name,
-                            list item_classes=[], str item_id="",
-                            object get_next_parent_info=None,
-                            int nondirectional_can_override_directional=True,
-                           ):
+            str item_name,
+            list item_classes=[], str item_id="",
+            object get_next_parent_info=None,
+            int nondirectional_can_override_directional=True,
+            ):
         directionals = ("-left", "-right", "-top", "-bottom")
         item_classes = list(item_classes)
         cdef dict result_attributes = {}
@@ -421,7 +432,11 @@ cdef class CSSRulesetCollection:
                                 c[0].name in result_attributes:
                             del(result_attributes[c[0].name])
 
-        result = {v[0].name: v[0] for v in result_attributes.values()}
+        result = CSSAttributeQueryResult(
+            {v[0].name: v[0] for v in result_attributes.values()},
+            {v[0].name: v[1].get_sorting_id()
+             for v in result_attributes.values()},
+        )
         #if SELECTOR_DEBUG:
         #    print("nettools.cssparse.CSSRulesetCollection: " +
         #          "DEBUG: ruleset attributes result: " +
