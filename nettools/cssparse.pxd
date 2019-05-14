@@ -31,6 +31,9 @@ cpdef disable_selector_debugging()
 cpdef tuple parse_border_attribute(v)
 
 
+cpdef csstransform_parse_border(result)
+
+
 cpdef CSSRulesetCollection parse_inline(str css)
 
 

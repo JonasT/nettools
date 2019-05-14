@@ -157,24 +157,39 @@ cpdef tuple parse_border_attribute(v):
 
 
 cpdef csstransform_parse_border(result):
-    if "border" in result.attributes:
-        rule_priority = result.priorities["border"]
-        (border_style, border_color, border_width) = \
-            result.attributes.parse_border_attribute(
-                result.attributes
-            )
-        induced_values = {
-            "border-style": border_style, "border-color": border_color,
-            "border-width": border_width,
-        }
-        for induced_vname in induced_values:
-            dir_suffixes = ["-left", "-top", "-bottom", "-right"]
-            for dir_suffix in [""] + dir_suffixes:
-                if induced_vname + dir_suffix in result.attributes and \
-                        result.priorities[induced_vname + dir_suffix] <\
-                        rule_priority:
-                    del(result.attributes[induced_vname + dir_suffix])
-                    del(result.priorities[induced_vname + dir_suffix])
+    for bsuffix in ["", "-left", "-top", "-bottom", "-right"]:
+        if "border" + bsuffix in result.attributes:
+            rule_priority = result.priorities["border" + bsuffix]
+            # Parse the "border" rule:
+            (border_style, border_color, border_width) = \
+                parse_border_attribute(
+                    result.attributes["border" + bsuffix].value
+                )
+            induced_values = {
+                "border-style": border_style,
+                "border-color": border_color,
+                "border-width": border_width,
+            }
+            # See what the induced values override & add them:
+            for induced_vname in induced_values:
+                for dir_suffix in ["", "-left", "-top", "-bottom", "-right"]:
+                    if len(bsuffix) > 0 and bsuffix != dir_suffix:
+                        continue
+                    if induced_vname + dir_suffix in result.attributes and \
+                            result.priorities[induced_vname + dir_suffix] <\
+                            rule_priority:
+                        del(result.attributes[induced_vname + dir_suffix])
+                        del(result.priorities[induced_vname + dir_suffix])
+                if induced_values[induced_vname] is not None and (
+                        bsuffix == "" or
+                        induced_vname not in result.attributes
+                        ):
+                    result.attributes[induced_vname + bsuffix] =\
+                        CSSAttribute(induced_vname + bsuffix,
+                                     induced_values[induced_vname])
+            # After adding the induced detail attributes, remove "border":
+            del(result.attributes["border" + bsuffix])
+            del(result.priorities["border" + bsuffix])
     return result
 
 

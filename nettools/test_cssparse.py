@@ -47,6 +47,21 @@ def test_extract_rule_strings():
     assert(result[1] == "myrule2{b:2}")
 
 
+def test_csstransform_parse_border():
+    result = cssparse.parse("""
+        * {border-style:solid;}
+        body {border:1px solid red;border-width:2px;}
+    """)
+    result = result.get_item_attributes(
+        "body", nondirectional_can_override_directional=True,
+        transform_funcs=[cssparse.csstransform_parse_border],
+    )
+    attributes = result.attributes
+    assert(set(attributes.keys()) == {
+        "border-width", "border-style", "border-color"
+    })
+
+
 def test_attribute_priorities():
     result = cssparse.parse("""
         * {border-style:solid;}
