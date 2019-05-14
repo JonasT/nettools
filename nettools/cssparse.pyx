@@ -114,6 +114,70 @@ cpdef parse_css_color(color):
     return None
 
 
+cpdef tuple parse_border_attribute(v):
+    v = v.strip().split()
+    set_type = None
+    set_width = None
+    set_color = None
+    types = ["dashed", "dotted", "solid"]
+    for t in types:
+        do_continue = True
+        while do_continue:
+            do_continue = False
+            if t in v:
+                do_continue = True
+                v.remove(t)
+                set_type = t
+    do_continue = True
+    while do_continue:
+        do_continue = False
+        for i in v:
+            _c = parse_css_color(i)
+            if _c is not None:
+                set_color = _c
+                v.remove(i)
+                do_continue = True
+                break
+        for i in v:
+            try:
+                set_width = str(int(i)) + "px"
+                v.remove(i)
+                do_continue = True
+                break
+            except (ValueError, TypeError):
+                if i.endswith("px"):
+                    try:
+                        set_width = str(int(i[:-len("px")])) + "px"
+                        v.remove(i)
+                        do_continue = True
+                        break
+                    except (ValueError, TypeError) as e:
+                        pass
+    return (set_type, set_color, set_width)
+
+
+cpdef csstransform_parse_border(result):
+    if "border" in result.attributes:
+        rule_priority = result.priorities["border"]
+        (border_style, border_color, border_width) = \
+            result.attributes.parse_border_attribute(
+                result.attributes
+            )
+        induced_values = {
+            "border-style": border_style, "border-color": border_color,
+            "border-width": border_width,
+        }
+        for induced_vname in induced_values:
+            dir_suffixes = ["-left", "-top", "-bottom", "-right"]
+            for dir_suffix in [""] + dir_suffixes:
+                if induced_vname + dir_suffix in result.attributes and \
+                        result.priorities[induced_vname + dir_suffix] <\
+                        rule_priority:
+                    del(result.attributes[induced_vname + dir_suffix])
+                    del(result.priorities[induced_vname + dir_suffix])
+    return result
+
+
 cdef class CSSSelector:
     cdef public list items
     cdef int _specificity
@@ -339,6 +403,7 @@ cdef class CSSRulesetCollection:
             list item_classes=[], str item_id="",
             object get_next_parent_info=None,
             int nondirectional_can_override_directional=True,
+            list transform_funcs=[csstransform_parse_border],
             ):
         directionals = ("-left", "-right", "-top", "-bottom")
         item_classes = list(item_classes)
@@ -441,6 +506,8 @@ cdef class CSSRulesetCollection:
         #    print("nettools.cssparse.CSSRulesetCollection: " +
         #          "DEBUG: ruleset attributes result: " +
         #          str(result))
+        for transform_func in transform_funcs:
+            result = transform_func(result)
         return result
 
 

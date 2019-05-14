@@ -53,7 +53,8 @@ def test_attribute_priorities():
         body {border:1px solid red;border-width:2px;}
     """)
     result = result.get_item_attributes(
-        "body", nondirectional_can_override_directional=True
+        "body", nondirectional_can_override_directional=True,
+        transform_funcs=[],
     )
     attributes = result.attributes
     attribute_priorities = result.priorities
@@ -66,6 +67,24 @@ def test_attribute_priorities():
            attribute_priorities["border"])
     assert(attribute_priorities["border-style"] <
            attribute_priorities["border-width"])
+
+
+def test_parse_border_attribute():
+    (border_type, border_color, border_width) = \
+        cssparse.parse_border_attribute("1px")
+    assert(border_type is None and
+           border_color is None and
+           border_width == "1px")
+    (border_type, border_color, border_width) = \
+        cssparse.parse_border_attribute("1px solid")
+    assert(border_type == "solid" and
+           border_color is None and
+           border_width == "1px")
+    (border_type, border_color, border_width) = \
+        cssparse.parse_border_attribute("solid 2px green")
+    assert(border_type == "solid" and
+           border_color == "#00ff00" and
+           border_width == "2px")
 
 
 def test_parse():
@@ -112,7 +131,9 @@ def test_complex_selector_scenarios():
         * {padding:5px}
         body {height:15px; padding:10px;}
     """)
-    attributes = result.get_item_attributes("body").attributes
+    attributes = result.get_item_attributes(
+        "body", transform_funcs=[]
+    ).attributes
     assert(set(attributes.keys()) == {"height", "padding"})
     assert(attributes["height"].value == "15px")
 
@@ -120,7 +141,9 @@ def test_complex_selector_scenarios():
         body {height:15px; padding:10px;}
         * {padding:5px}
     """)
-    attributes = result.get_item_attributes("body").attributes
+    attributes = result.get_item_attributes(
+        "body", transform_funcs=[]
+    ).attributes
     assert(set(attributes.keys()) == {"height", "padding"})
     assert(attributes["height"].value == "15px")
     assert(attributes["padding"].value == "10px")
@@ -129,7 +152,9 @@ def test_complex_selector_scenarios():
         body {height:15px; padding:10px;}
         body {padding:5px}
     """)
-    attributes = result.get_item_attributes("body").attributes
+    attributes = result.get_item_attributes(
+        "body", transform_funcs=[]
+    ).attributes
     assert(set(attributes.keys()) == {"height", "padding"})
     assert(attributes["height"].value == "15px")
     assert(attributes["padding"].value == "5px")
@@ -143,7 +168,8 @@ def test_directional_fallback_to_nondirectional():
         body {padding:10px;}
     """)
     attributes = result.get_item_attributes(
-        "body", nondirectional_can_override_directional=True
+        "body", nondirectional_can_override_directional=True,
+        transform_funcs=[],
     ).attributes
     assert("padding" in attributes)
     if "padding-left" in attributes:
@@ -157,7 +183,8 @@ def test_directional_fallback_to_nondirectional():
         body {padding:10px;padding-left:3px;}
     """)
     attributes = result.get_item_attributes(
-        "body", nondirectional_can_override_directional=True
+        "body", nondirectional_can_override_directional=True,
+        transform_funcs=[],
     ).attributes
     assert(set(attributes.keys()) == {"padding", "padding-left"})
     assert(attributes["padding-left"].value == "3px")
@@ -167,6 +194,7 @@ def test_directional_fallback_to_nondirectional():
         body {padding:10px;}
     """)
     attributes = result.get_item_attributes(
-        "body", nondirectional_can_override_directional=False
+        "body", nondirectional_can_override_directional=False,
+        transform_funcs=[],
     ).attributes
     assert(attributes["padding-left"].value == "5px")
