@@ -49,7 +49,7 @@ def test_extract_rule_strings():
 
 def test_csstransform_parse_border():
     result = cssparse.parse("""
-        * {border-style:solid;}
+        * {border-style:dotted;}
         body {border:1px solid red;border-width:2px;}
     """)
     result = result.get_item_attributes(
@@ -60,6 +60,26 @@ def test_csstransform_parse_border():
     assert(set(attributes.keys()) == {
         "border-width", "border-style", "border-color"
     })
+    assert(attributes["border-width"].value == "2px")
+    assert(attributes["border-style"].value == "solid")
+    assert(attributes["border-color"].value == "#ff0000")
+
+    # Retry with different rule order, and one more override:
+    result = cssparse.parse("""
+        body {border-width:2px;border:1px solid red;}
+        * {border-style:dotted; border-width:5px;}
+    """)
+    result = result.get_item_attributes(
+        "body", nondirectional_can_override_directional=True,
+        transform_funcs=[cssparse.csstransform_parse_border],
+    )
+    attributes = result.attributes
+    assert(set(attributes.keys()) == {
+        "border-width", "border-style", "border-color"
+    })
+    assert(attributes["border-width"].value == "2px")
+    assert(attributes["border-style"].value == "solid")
+    assert(attributes["border-color"].value == "#ff0000")
 
 
 def test_attribute_priorities():

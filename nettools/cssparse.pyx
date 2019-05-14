@@ -139,20 +139,26 @@ cpdef tuple parse_border_attribute(v):
                 do_continue = True
                 break
         for i in v:
-            try:
-                set_width = str(int(i)) + "px"
-                v.remove(i)
-                do_continue = True
+            match = False
+            for ending in ["px", "rem", "em", "vw", "vh"]:
+                try:
+                    set_width = str(int(i)) + ending
+                    v.remove(i)
+                    do_continue = True
+                    match = True
+                    break
+                except (ValueError, TypeError):
+                    if i.endswith(ending):
+                        try:
+                            set_width = str(int(i[:-len(ending)])) + ending
+                            v.remove(i)
+                            do_continue = True
+                            match = True
+                            break
+                        except (ValueError, TypeError) as e:
+                            pass
+            if match:
                 break
-            except (ValueError, TypeError):
-                if i.endswith("px"):
-                    try:
-                        set_width = str(int(i[:-len("px")])) + "px"
-                        v.remove(i)
-                        do_continue = True
-                        break
-                    except (ValueError, TypeError) as e:
-                        pass
     return (set_type, set_color, set_width)
 
 
@@ -172,7 +178,8 @@ cpdef csstransform_parse_border(result):
             }
             # See what the induced values override & add them:
             for induced_vname in induced_values:
-                for dir_suffix in ["", "-left", "-top", "-bottom", "-right"]:
+                for dir_suffix in ["", "-left", "-top",
+                                   "-bottom", "-right"]:
                     if len(bsuffix) > 0 and bsuffix != dir_suffix:
                         continue
                     if induced_vname + dir_suffix in result.attributes and \
@@ -183,6 +190,8 @@ cpdef csstransform_parse_border(result):
                 if induced_values[induced_vname] is not None and (
                         bsuffix == "" or
                         induced_vname not in result.attributes
+                        ) and (
+                        induced_vname + bsuffix not in result.attributes
                         ):
                     result.attributes[induced_vname + bsuffix] =\
                         CSSAttribute(induced_vname + bsuffix,
