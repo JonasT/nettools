@@ -164,17 +164,21 @@ cpdef tuple parse_border_attribute(v):
 
 cpdef csstransform_parse_border(result):
     for bsuffix in ["", "-left", "-top", "-bottom", "-right"]:
-        if "border" + bsuffix in result.attributes:
-            rule_priority = result.priorities["border" + bsuffix]
+        if "border" + bsuffix in result.attributes or \
+                "outline" + bsuffix in result.attributes:
+            attrn = "border"
+            if "outline" + bsuffix in result.attributes:
+                attrn = "outline"
+            rule_priority = result.priorities[attrn + bsuffix]
             # Parse the "border" rule:
             (border_style, border_color, border_width) = \
                 parse_border_attribute(
-                    result.attributes["border" + bsuffix].value
+                    result.attributes[attrn + bsuffix].value
                 )
             induced_values = {
-                "border-style": border_style,
-                "border-color": border_color,
-                "border-width": border_width,
+                attrn + "-style": border_style,
+                attrn + "-color": border_color,
+                attrn + "-width": border_width,
             }
             # See what the induced values override & add them:
             for induced_vname in induced_values:
@@ -197,8 +201,8 @@ cpdef csstransform_parse_border(result):
                         CSSAttribute(induced_vname + bsuffix,
                                      induced_values[induced_vname])
             # After adding the induced detail attributes, remove "border":
-            del(result.attributes["border" + bsuffix])
-            del(result.priorities["border" + bsuffix])
+            del(result.attributes[attrn + bsuffix])
+            del(result.priorities[attrn + bsuffix])
     return result
 
 
