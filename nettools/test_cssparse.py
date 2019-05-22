@@ -47,6 +47,13 @@ def test_extract_rule_strings():
     assert(result[1] == "myrule2{b:2}")
 
 
+def test_css_selector_item_constructor():
+    item = cssparse.CSSSelectorItem("#test")
+    assert(item.check_against("foobar", element_id="test"))
+    assert(not item.check_against("foobar"))
+    assert(not item.check_against("foobar", element_id="foobar"))
+
+
 def test_csstransform_parse_border():
     result = cssparse.parse("""
         * {border-style:dotted;}
@@ -106,17 +113,23 @@ def test_attribute_priorities():
 
 def test_parse_border_attribute():
     (border_type, border_color, border_width) = \
-        cssparse.parse_border_attribute("1px")
+        cssparse.parse_border_attribute(
+            "1px", be_lenient_with_incomplete=False,
+        )
     assert(border_type is None and
            border_color is None and
            border_width == "1px")
     (border_type, border_color, border_width) = \
-        cssparse.parse_border_attribute("1px solid")
+        cssparse.parse_border_attribute(
+            "1px solid", be_lenient_with_incomplete=False,
+        )
     assert(border_type == "solid" and
            border_color is None and
            border_width == "1px")
     (border_type, border_color, border_width) = \
-        cssparse.parse_border_attribute("solid 2px green")
+        cssparse.parse_border_attribute(
+            "solid 2px green", be_lenient_with_incomplete=False,
+        )
     assert(border_type == "solid" and
            border_color == "#00ff00" and
            border_width == "2px")
@@ -129,9 +142,9 @@ def test_parse():
     """)
 
     assert(len(result.rules) == 2)
-    assert(result.rules[0].selector.items == ["*"])
+    assert(result.rules[0].selector.as_str_list() == ["*"])
     assert(len(result.rules[0].attributes) == 1)
-    assert(result.rules[1].selector.items == ["body"])
+    assert(result.rules[1].selector.as_str_list() == ["body"])
     assert(len(result.rules[1].attributes) == 2)
 
 

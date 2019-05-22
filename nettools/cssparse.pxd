@@ -18,6 +18,12 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 '''
 
+cdef class CSSSelectorItem:
+    cdef public str content
+    cdef object tag_constraint, classes_constraint
+    cdef object id_constraint, detail_constraint
+
+
 cdef class CSSRulesetCollection:
     cdef public list rules
 

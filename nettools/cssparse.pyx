@@ -114,7 +114,10 @@ cpdef parse_css_color(color):
     return None
 
 
-cpdef tuple parse_border_attribute(v):
+cpdef tuple parse_border_attribute(
+        v,
+        be_lenient_with_incomplete=True,
+        ):
     v = v.strip().split()
     set_type = None
     set_width = None
@@ -159,8 +162,10 @@ cpdef tuple parse_border_attribute(v):
                             pass
             if match:
                 break
-    if set_color is not None or set_width is not None or \
-            set_type is not None:
+    if be_lenient_with_incomplete and (
+            set_color is not None or set_width is not None or
+            set_type is not None
+            ):
         if set_type is None:
             set_type = "solid"
         if set_color is None:
@@ -261,7 +266,7 @@ cdef class CSSSelectorItem:
     def check_against(self, element_tag_name,
                       element_classes=[],
                       element_id=None):
-        if len(self.detail_constraint) > 0:
+        if self.detail_constraint is not None:
             # We don't support these yet.
             return False
 
@@ -335,6 +340,9 @@ cdef class CSSSelector:
                 continue
             self._specificity += self.get_item_specificity(item.content)
 
+    def as_str_list(self):
+        return [i.content for i in self.items]
+
     @property
     def specificity(self):
         return self._specificity
@@ -374,7 +382,8 @@ cdef class CSSRule:
 
     def __repr__(self):
         return "<CSSRule '" +\
-            (" ".join(self.selector.items)).replace("'", "'\"'\"'") +\
+            (" ".join(self.selector.as_str_list())).\
+            replace("'", "'\"'\"'") +\
             "'/" + str(len(self.attributes)) + " attrs>"
 
     def applies_to_item_chain(self, chain):
