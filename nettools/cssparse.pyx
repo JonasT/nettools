@@ -140,14 +140,14 @@ cpdef tuple parse_border_attribute(v):
                 break
         for i in v:
             match = False
-            for ending in ["px", "rem", "em", "vw", "vh"]:
-                try:
-                    set_width = str(int(i)) + ending
-                    v.remove(i)
-                    do_continue = True
-                    match = True
-                    break
-                except (ValueError, TypeError):
+            try:
+                set_width = str(int(i)) + "px"
+                v.remove(i)
+                do_continue = True
+                match = True
+                break
+            except (ValueError, TypeError):
+                for ending in ["px", "rem", "em", "vw", "vh"]:
                     if i.endswith(ending):
                         try:
                             set_width = str(int(i[:-len(ending)])) + ending
@@ -159,6 +159,14 @@ cpdef tuple parse_border_attribute(v):
                             pass
             if match:
                 break
+    if set_color is not None or set_width is not None or \
+            set_type is not None:
+        if set_type is None:
+            set_type = "solid"
+        if set_color is None:
+            set_color = "#000"
+        if set_width is None:
+            set_width = "1px"
     return (set_type, set_color, set_width)
 
 
