@@ -214,6 +214,110 @@ cpdef csstransform_parse_border(result):
     return result
 
 
+cdef class CSSSelectorItem:
+    def __init__(self, str item_selector):
+        self.content = item_selector
+        self.tag_constraint = None
+        self.classes_constraint = None
+        self.id_constraint = None
+        self.detail_constraint = None
+
+        # Abort if this is a special chaining item:
+        if self.content == ">" or self.content == "*":
+            return
+
+        # Extract detail constraint:
+        cdef str detail_constraint = item_selector.partition("[")[2].strip()
+        if detail_constraint.endswith("]"):
+            detail_constraint = detail_constraint[:-1].strip()
+        if len(detail_constraint) > 0:
+            self.detail_constraint = detail_constraint
+        item_selector = item_selector.partition("[")[0].strip()
+
+        # Extract name/tag, id and classes constraints:
+        selector_item_name = item_selector
+        selector_item_classes = []
+        selector_item_id = ""
+        while selector_item_name.find(".") >= 0:
+            new_class_str = selector_item_name.rpartition(".")[2]
+            selector_item_name = selector_item_name.rpartition(".")[0]
+            if new_class_str.find("#") > 0:
+                selector_name += new_class_str.partition("#")[2]
+                new_class_str = new_class_str.partition("#")[0]
+            selector_item_classes += [
+                c.strip() for c in new_class_str.split(".")
+                if len(c.strip()) > 0
+            ]
+        if selector_item_name.find("#") >= 0:
+            selector_item_id = selector_item_name.rpartition("#")[2]
+            selector_item_name = selector_item_name.rpartition("#")[0]
+        if len(selector_item_name.strip()) > 0:
+            self.tag_constraint = selector_item_name.strip()
+        if len(selector_item_id.strip()) > 0:
+            self.id_constraint = selector_item_id.strip()
+        if len(selector_item_classes) > 0:
+            self.classes_constraint = selector_item_classes
+
+    def check_against(self, element_tag_name,
+                      element_classes=[],
+                      element_id=None):
+        if len(self.detail_constraint) > 0:
+            # We don't support these yet.
+            return False
+
+        if self.content == "*":
+            if SELECTOR_DEBUG:
+                print("nettools.cssparse.CSSSelectorItem: " +
+                      "DEBUG: check_against" +
+                      str((self.content, element_tag_name,
+                           element_classes, element_id)) +
+                      " -> True"
+                )
+            return True
+
+        # Check all the constraints:
+        if self.tag_constraint is not None and \
+                self.tag_constraint != element_tag_name:
+            if SELECTOR_DEBUG:
+                print("nettools.cssparse.CSSSelectorItem: " +
+                      "DEBUG: check_against" +
+                      str((self.content, element_tag_name,
+                           element_classes, element_id)) +
+                      " -> False"
+                )
+            return False
+        if self.classes_constraint is not None:
+            if len(set(self.classes_constraint).intersection(
+                        set(element_classes)
+                   )) < len(self.classes_constraint):
+                if SELECTOR_DEBUG:
+                    print("nettools.cssparse.CSSSelectorItem: " +
+                          "DEBUG: check_against" +
+                          str((self.content, element_tag_name,
+                               element_classes, element_id)) +
+                          " -> False"
+                    )
+                return False
+        if self.id_constraint is not None and \
+                self.id_constraint != element_id:
+            if SELECTOR_DEBUG:
+                print("nettools.cssparse.CSSSelectorItem: " +
+                      "DEBUG: check_against" +
+                      str((self.content, element_tag_name,
+                           element_classes, element_id)) +
+                      " -> False"
+                )
+            return False
+        if SELECTOR_DEBUG:
+            print("nettools.cssparse.CSSSelectorItem: " +
+                  "DEBUG: check_against" +
+                  str((self.content, element_tag_name,
+                       element_classes, element_id)) +
+                  " -> True"
+            )
+        return True
+
+
 cdef class CSSSelector:
     cdef public list items
     cdef int _specificity
@@ -221,15 +325,15 @@ cdef class CSSSelector:
 
     def __init__(self, str selector_string):
         selector_string = selector_string.strip()
-        self.items = selector_string.split()
+        self.items = [CSSSelectorItem(i) for i in selector_string.split()]
         self.applies_any = False
-        if len(self.items) == 1 and self.items[0] == "*":
+        if len(self.items) == 1 and self.items[0].content == "*":
             self.applies_any = True
         self._specificity = 0
         for item in self.items:
-            if item == ">" or item == "*":
+            if item.content == ">" or item.content == "*":
                 continue
-            self._specificity += self.get_item_specificity(item)
+            self._specificity += self.get_item_specificity(item.content)
 
     @property
     def specificity(self):
@@ -247,79 +351,14 @@ cdef class CSSSelector:
 
     @classmethod
     def check_item(cls,
-                   str item_selector, str item_name,
+                   object item_selector, str item_name,
                    list item_classes=[],
-                   str item_id=None):
-        item_classes = list(item_classes)
-        cdef str detail_constraint = item_selector.partition("[")[2].strip()
-        if detail_constraint.endswith("]"):
-            detail_constraint = detail_constraint[:-1].strip()
-        if len(detail_constraint) > 0:
-            # We don't support that yet.
-            return False
-
-        item_selector = item_selector.partition("[")[0].strip()
-
-        if item_selector == "*":
-            if SELECTOR_DEBUG:
-                print("nettools.cssparse.CSSSelector: " +
-                      "DEBUG: check_item" +
-                      str((item_selector, item_name,
-                           item_classes, item_id)) +
-                      " -> True"
-                )
-            return True
-        selector_item_name = item_selector
-        selector_item_classes = []
-        selector_item_id = ""
-        while selector_item_name.find(".") >= 0:
-            new_class_str = selector_item_name.rpartition(".")[2]
-            selector_item_name = selector_item_name.rpartition(".")[0]
-            if new_class_str.find("#") > 0:
-                selector_name += new_class_str.partition("#")[2]
-                new_class_str = new_class_str.partition("#")[0]
-            selector_item_classes += [
-                c.strip() for c in new_class_str.split(".")
-                if len(c.strip()) > 0
-            ]
-        if selector_item_name.find("#") >= 0:
-            selector_item_id = selector_item_name.rpartition("#")[2]
-            selector_item_name = selector_item_name.rpartition("#")[0]
-
-        if len(selector_item_name) > 0 and item_name != selector_item_name:
-            if SELECTOR_DEBUG:
-                print("nettools.cssparse.CSSSelector: " +
-                      "DEBUG: check_item" +
-                      str((item_selector, item_name, item_classes, item_id)) +
-                      " -> False"
-                )
-            return False
-        if len(selector_item_classes) > 0:
-            for required_class in selector_item_classes:
-                if required_class not in item_classes:
-                    if SELECTOR_DEBUG:
-                        print("nettools.cssparse.CSSSelector: " +
-                              "DEBUG: check_item" +
-                              str((item_selector, item_name, item_classes,
-                                   item_id)) +
-                              " -> False"
-                        )
-                    return False
-        if len(selector_item_id) > 0 and item_id != selector_item_id:
-            if SELECTOR_DEBUG:
-                print("nettools.cssparse.CSSSelector: " +
-                      "DEBUG: check_item" +
-                      str((item_selector, item_name, item_classes, item_id)) +
-                      " -> False"
-                )
-            return False
-        if SELECTOR_DEBUG:
-            print("nettools.cssparse.CSSSelector: " +
-                  "DEBUG: check_item" +
-                  str((item_selector, item_name, item_classes, item_id)) +
-                  " -> True"
-            )
-        return True
+                  str item_id=None):
+        if type(item_selector) == str:
+            item_selector = CSSSelectorItem(item_selector)
+        return item_selector.check_against(
+            item_name, element_classes=item_classes, element_id=item_id
+        )
 
 
 cdef class CSSRule:
