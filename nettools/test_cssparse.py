@@ -38,6 +38,35 @@ def test_extract_string_without_comments():
     assert(result == "\"ab\\\"/*\"")
 
 
+def test_none_as_color():
+    result = cssparse.parse("""
+        * {background-color:red;}
+    """)
+    assert(result.get_item_attributes("body").
+           attributes["background-color"].value == 'red')
+    result = cssparse.parse("""
+        * {background-color:red;}
+        body {background-color:none;}
+    """)
+    assert("background-color" not in \
+           result.get_item_attributes(
+               "body", clear_out_none_values=True
+           ).attributes)
+
+
+def test_multitag_query():
+    ruleset = cssparse.parse("""
+        * {background-color:blue;}
+        html {color:yellow;}
+        body {background-color:red;}
+    """)
+    result = ruleset.get_item_attributes(
+        ["html", "body"],
+    )
+    assert(result.attributes["color"].value == "yellow")
+    assert(result.attributes["background-color"].value == "red")
+
+
 def test_extract_rule_strings():
     result = cssparse.extract_rule_strings(
         "myrule{a:1}/*test } a */myrule2{b:2}"
@@ -49,9 +78,9 @@ def test_extract_rule_strings():
 
 def test_css_selector_item_constructor():
     item = cssparse.CSSSelectorItem("#test")
-    assert(item.check_against("foobar", element_id="test"))
-    assert(not item.check_against("foobar"))
-    assert(not item.check_against("foobar", element_id="foobar"))
+    assert(item.check_against(["foobar"], element_id="test"))
+    assert(not item.check_against(["foobar"]))
+    assert(not item.check_against(["foobar"], element_id="foobar"))
 
 
 def test_csstransform_parse_border():
@@ -152,22 +181,22 @@ def test_cssselector_check_item():
     cssparse.enable_selector_debugging()
 
     assert(cssparse.CSSSelector.check_item(
-        "*", "bla"
+        "*", ["bla"]
     ) is True)
     assert(cssparse.CSSSelector.check_item(
-        ".test", "bla"
+        ".test", ["bla"]
     ) is False)
     assert(cssparse.CSSSelector.check_item(
-        ".test", "bla", item_classes=["test"]
+        ".test", ["bla"], item_classes=["test"]
     ) is True)
     assert(cssparse.CSSSelector.check_item(
-        ".test.test2", "bla", item_classes=["test"]
+        ".test.test2", ["bla"], item_classes=["test"]
     ) is False)
     assert(cssparse.CSSSelector.check_item(
-        ".test", "bla", item_classes=["test2", "test"]
+        ".test", ["bla"], item_classes=["test2", "test"]
     ) is True)
     assert(cssparse.CSSSelector.check_item(
-        "myitem.test1.test2", "myitem",
+        "myitem.test1.test2", ["myitem"],
         item_classes=["test1", "test2", "test3"]
     ) is True)
 

@@ -263,7 +263,7 @@ cdef class CSSSelectorItem:
         if len(selector_item_classes) > 0:
             self.classes_constraint = selector_item_classes
 
-    def check_against(self, element_tag_name,
+    def check_against(self, list element_tag_names,
                       element_classes=[],
                       element_id=None):
         if self.detail_constraint is not None:
@@ -274,7 +274,7 @@ cdef class CSSSelectorItem:
             if SELECTOR_DEBUG:
                 print("nettools.cssparse.CSSSelectorItem: " +
                       "DEBUG: check_against" +
-                      str((self.content, element_tag_name,
+                      str((self.content, element_tag_names,
                            element_classes, element_id)) +
                       " -> True"
                 )
@@ -282,11 +282,11 @@ cdef class CSSSelectorItem:
 
         # Check all the constraints:
         if self.tag_constraint is not None and \
-                self.tag_constraint != element_tag_name:
+                self.tag_constraint not in element_tag_names:
             if SELECTOR_DEBUG:
                 print("nettools.cssparse.CSSSelectorItem: " +
                       "DEBUG: check_against" +
-                      str((self.content, element_tag_name,
+                      str((self.content, element_tag_names,
                            element_classes, element_id)) +
                       " -> False"
                 )
@@ -298,7 +298,7 @@ cdef class CSSSelectorItem:
                 if SELECTOR_DEBUG:
                     print("nettools.cssparse.CSSSelectorItem: " +
                           "DEBUG: check_against" +
-                          str((self.content, element_tag_name,
+                          str((self.content, element_tag_names,
                                element_classes, element_id)) +
                           " -> False"
                     )
@@ -308,7 +308,7 @@ cdef class CSSSelectorItem:
             if SELECTOR_DEBUG:
                 print("nettools.cssparse.CSSSelectorItem: " +
                       "DEBUG: check_against" +
-                      str((self.content, element_tag_name,
+                      str((self.content, element_tag_names,
                            element_classes, element_id)) +
                       " -> False"
                 )
@@ -316,7 +316,7 @@ cdef class CSSSelectorItem:
         if SELECTOR_DEBUG:
             print("nettools.cssparse.CSSSelectorItem: " +
                   "DEBUG: check_against" +
-                  str((self.content, element_tag_name,
+                  str((self.content, element_tag_names,
                        element_classes, element_id)) +
                   " -> True"
             )
@@ -359,13 +359,13 @@ cdef class CSSSelector:
 
     @classmethod
     def check_item(cls,
-                   object item_selector, str item_name,
+                   object item_selector, object item_names,
                    list item_classes=[],
                   str item_id=None):
         if type(item_selector) == str:
             item_selector = CSSSelectorItem(item_selector)
         return item_selector.check_against(
-            item_name, element_classes=item_classes, element_id=item_id
+            item_names, element_classes=item_classes, element_id=item_id
         )
 
 
@@ -409,7 +409,7 @@ cdef class CSSRule:
             int(self.selector.specificity) * 10000000
 
     def applies_to_item(self,
-            str item_name,
+            list item_names,
             list item_classes=[],
             str item_id="",
             object get_next_parent_info=None
@@ -427,10 +427,10 @@ cdef class CSSRule:
         while i > 0:
             i -= 1
             if first_item:
-                item_info = (item_name, item_classes, item_id)
+                item_info = (item_names, item_classes, item_id)
                 if not self.selector.check_item(
                         self.selector.items[i],
-                        item_name,
+                        item_names,
                         item_classes=item_classes,
                         item_id=item_id
                         ):
@@ -450,10 +450,13 @@ cdef class CSSRule:
                     item_info = (parent[0],
                                  list(parent[1]) if len(parent) >= 2 else [],
                                  parent[2] if len(parent) >= 3 else "")
+                    if type(item_info[0]) == str:
+                        item_info[0] = [item_info[0]]
                     if not self.selector.check_item(
                             self.selector.items[i],
                             item_info[0],
-                            item_classes=item_info[1], item_id=item_info[2]
+                            item_classes=item_info[1],
+                            item_id=item_info[2]
                             ):
                         if require_direct_descendant:
                             return False
@@ -483,12 +486,18 @@ cdef class CSSRulesetCollection:
         return "<CSSRuleCollection" + str(self.rules) + ">"
 
     def get_item_attributes(self,
-            str item_name,
+            object item_name_str_or_name_list,
             list item_classes=[], str item_id="",
             object get_next_parent_info=None,
             int nondirectional_can_override_directional=True,
+            int clear_out_none_values=True,
             list transform_funcs=[csstransform_parse_border],
             ):
+        cdef list item_names = []
+        if type(item_name_str_or_name_list) == str:
+            item_names.append(item_name_str_or_name_list)
+        else:
+            item_names = list(item_name_str_or_name_list)
         directionals = ("-left", "-right", "-top", "-bottom")
         item_classes = list(item_classes)
         cdef dict result_attributes = {}
@@ -497,7 +506,7 @@ cdef class CSSRulesetCollection:
             rule_id += 1
             if rule.occurrence_order < 0:
                 rule.occurrence_order = rule_id
-            if rule.applies_to_item(item_name, item_classes, item_id,
+            if rule.applies_to_item(item_names, item_classes, item_id,
                                     get_next_parent_info=
                                         get_next_parent_info
                                     ):
@@ -505,7 +514,7 @@ cdef class CSSRulesetCollection:
                     if SELECTOR_DEBUG:
                         print("nettools.cssparse.CSSRulesetCollection: " +
                               "DEBUG: rule's applies_to_item" +
-                              str((item_name, item_classes, item_id,
+                              str((item_names, item_classes, item_id,
                                    get_next_parent_info)) +
                               "=True, rule=" + str(rule))
 
@@ -592,6 +601,13 @@ cdef class CSSRulesetCollection:
         #          str(result))
         for transform_func in transform_funcs:
             result = transform_func(result)
+
+        if clear_out_none_values:
+            new_attributes = dict()
+            for k in result.attributes:
+                if result.attributes[k].value.lower() != "none":
+                    new_attributes[k] = result.attributes[k]
+            result.attributes = new_attributes
         return result
 
 
