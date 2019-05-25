@@ -386,21 +386,6 @@ cdef class CSSRule:
             replace("'", "'\"'\"'") +\
             "'/" + str(len(self.attributes)) + " attrs>"
 
-    def applies_to_item_chain(self, chain):
-        i = len(chain) - 1
-        def get_next_parent_info():
-            nonlocal i
-            i -= 1
-            if i > 0:
-                return chain[i]
-            raise StopIteration("end of parents")
-        return self.applies_to_item(
-            chain[-1][0],
-            chain[-1][1] if len(chain[-1]) >= 2 else "",
-            chain[-2][2] if len(chain[-2]) >= 3 else "",
-            get_next_parent_info=get_next_parent_info
-        )
-
     def trumps_other_rule(self, rule):
         return (self.get_sorting_id() > rule.get_sorting_id())
 
@@ -412,7 +397,9 @@ cdef class CSSRule:
             list item_names,
             list item_classes=[],
             str item_id="",
-            object get_next_parent_info=None
+            object get_next_parent_info=None,
+            object get_following_sibling_info=None,
+            object get_preceding_sibling_info=None,
             ):
         item_classes = list(item_classes)
         if self.selector.applies_any:
@@ -422,11 +409,23 @@ cdef class CSSRule:
         cdef int first_item = True
         cdef tuple item_info
 
+        if type(get_next_parent_info) == list:
+            _orig_list = get_next_parent_info
+            def iterator_func():
+                nonlocal _orig_list
+                if len(_orig_list) == 0:
+                    raise StopIteration("end of parents")
+                result = _orig_list[0]
+                _orig_list[:] = _orig_list[1:]
+                return result
+            get_next_parent_info = iterator_func
+
         cdef int require_direct_descendant = False
         cdef int i = len(self.selector.items) 
         while i > 0:
             i -= 1
             if first_item:
+                first_item = False
                 item_info = (item_names, item_classes, item_id)
                 if not self.selector.check_item(
                         self.selector.items[i],
@@ -436,27 +435,29 @@ cdef class CSSRule:
                         ):
                     return False
                 require_direct_descendant = False
-            elif self.selector.items[i] == ">":
+            elif self.selector.items[i].content == ">":
                 require_direct_descendant = True
                 continue
             else:
                 while True:
                     try:
                         parent = get_next_parent_info()
-                    except (StopIteration, ValueError):
+                    except (StopIteration, ValueError, TypeError):
                         parent = None
                     if parent is None:
                         return False
-                    item_info = (parent[0],
-                                 list(parent[1]) if len(parent) >= 2 else [],
-                                 parent[2] if len(parent) >= 3 else "")
-                    if type(item_info[0]) == str:
-                        item_info[0] = [item_info[0]]
+                    parent_info = [
+                        parent[0],
+                        list(parent[1]) if len(parent) >= 2 else [],
+                        parent[2] if len(parent) >= 3 else ""
+                    ]
+                    if type(parent_info[0]) == str:
+                        parent_info[0] = [parent_info[0]]
                     if not self.selector.check_item(
                             self.selector.items[i],
-                            item_info[0],
-                            item_classes=item_info[1],
-                            item_id=item_info[2]
+                            parent_info[0],
+                            item_classes=parent_info[1],
+                            item_id=parent_info[2]
                             ):
                         if require_direct_descendant:
                             return False
@@ -489,6 +490,8 @@ cdef class CSSRulesetCollection:
             object item_name_str_or_name_list,
             list item_classes=[], str item_id="",
             object get_next_parent_info=None,
+            object get_following_sibling_info=None,
+            object get_preceding_sibling_info=None,
             int nondirectional_can_override_directional=True,
             int clear_out_none_values=True,
             list transform_funcs=[csstransform_parse_border],
@@ -508,7 +511,11 @@ cdef class CSSRulesetCollection:
                 rule.occurrence_order = rule_id
             if rule.applies_to_item(item_names, item_classes, item_id,
                                     get_next_parent_info=
-                                        get_next_parent_info
+                                        get_next_parent_info,
+                                    get_following_sibling_info=
+                                        get_following_sibling_info,
+                                    get_preceding_sibling_info=
+                                        get_preceding_sibling_info,
                                     ):
                 for attr in rule.attributes:
                     if SELECTOR_DEBUG:

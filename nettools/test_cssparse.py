@@ -76,6 +76,31 @@ def test_extract_rule_strings():
     assert(result[1] == "myrule2{b:2}")
 
 
+def test_child_and_descendant_selectors():
+    cssparse.enable_selector_debugging()
+
+    result = cssparse.parse("""
+        div span {color:red;}
+    """)
+    result = result.get_item_attributes(
+        "span", get_next_parent_info=[
+            ("p",),
+            ("div",),
+        ]
+    )
+    assert(result.attributes["color"].value == "red")
+    result = cssparse.parse("""
+        div > span {color:red;}
+    """)
+    result = result.get_item_attributes(
+        "span", get_next_parent_info=[
+            ("p",),
+            ("div",),
+        ]
+    )
+    assert("color" not in result.attributes)
+
+
 def test_css_selector_item_constructor():
     item = cssparse.CSSSelectorItem("#test")
     assert(item.check_against(["foobar"], element_id="test"))
