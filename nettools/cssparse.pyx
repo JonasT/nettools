@@ -263,9 +263,13 @@ cdef class CSSSelectorItem:
         if len(selector_item_classes) > 0:
             self.classes_constraint = selector_item_classes
 
-    def check_against(self, list element_tag_names,
+    def check_against(self,
+                      list element_tag_names,
                       element_classes=[],
-                      element_id=None):
+                      element_id=None,
+                      get_following_sibling_info=None,
+                      get_preceding_sibling_info=None,
+                      ):
         if self.detail_constraint is not None:
             # We don't support these yet.
             return False
@@ -361,11 +365,20 @@ cdef class CSSSelector:
     def check_item(cls,
                    object item_selector, object item_names,
                    list item_classes=[],
-                  str item_id=None):
+                   str item_id=None,
+                   get_following_sibling_info=None,
+                   get_preceding_sibling_info=None,
+                   ):
         if type(item_selector) == str:
             item_selector = CSSSelectorItem(item_selector)
         return item_selector.check_against(
-            item_names, element_classes=item_classes, element_id=item_id
+            item_names,
+            element_classes=item_classes,
+            element_id=item_id,
+            get_following_sibling_info=
+                get_following_sibling_info,
+            get_preceding_sibling_info=
+                get_preceding_sibling_info,
         )
 
 
@@ -420,6 +433,28 @@ cdef class CSSRule:
                 return result
             get_next_parent_info = iterator_func
 
+        if type(get_following_sibling_info) == list:
+            _orig_list = get_following_sibling_info
+            def iterator_func():
+                nonlocal _orig_list
+                if len(_orig_list) == 0:
+                    raise StopIteration("end of preceding siblings")
+                result = _orig_list[0]
+                _orig_list[:] = _orig_list[1:]
+                return result
+            get_following_sibling_info = iterator_func
+
+        if type(get_preceding_sibling_info) == list:
+            _orig_list = get_preceding_sibling_info
+            def iterator_func():
+                nonlocal _orig_list
+                if len(_orig_list) == 0:
+                    raise StopIteration("end of followup siblings")
+                result = _orig_list[0]
+                _orig_list[:] = _orig_list[1:]
+                return result
+            get_preceding_sibling_info = iterator_func
+
         cdef int require_direct_descendant = False
         cdef int i = len(self.selector.items) 
         while i > 0:
@@ -431,7 +466,11 @@ cdef class CSSRule:
                         self.selector.items[i],
                         item_names,
                         item_classes=item_classes,
-                        item_id=item_id
+                        item_id=item_id,
+                        get_following_sibling_info=
+                            get_following_sibling_info,
+                        get_preceding_sibling_info=
+                            get_preceding_sibling_info,
                         ):
                     return False
                 require_direct_descendant = False
@@ -457,7 +496,11 @@ cdef class CSSRule:
                             self.selector.items[i],
                             parent_info[0],
                             item_classes=parent_info[1],
-                            item_id=parent_info[2]
+                            item_id=parent_info[2],
+                            get_following_sibling_info=
+                                get_following_sibling_info,
+                            get_preceding_sibling_info=
+                                get_preceding_sibling_info,
                             ):
                         if require_direct_descendant:
                             return False
