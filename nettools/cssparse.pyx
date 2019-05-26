@@ -219,24 +219,38 @@ cpdef csstransform_parse_border(result):
     return result
 
 
+cdef class CSSColonSpecialSelector:
+    cdef public str name
+    cdef public list arguments
+
+    def __init__(self, name, arguments=[]):
+        self.name = name
+        self.arguments = list(arguments)
+
+
 cdef class CSSSelectorItem:
     def __init__(self, str item_selector):
         self.content = item_selector
         self.tag_constraint = None
         self.classes_constraint = None
         self.id_constraint = None
-        self.detail_constraint = None
+        self.attribute_constraints = []
+        self.colon_special_constraints = []
 
         # Abort if this is a special chaining item:
         if self.content == ">" or self.content == "*":
             return
 
+        # Extract colon special selectors:
+        (item_selector, self.colon_special_constraints) =\
+            self.extract_colon_selectors(item_selector)
+
         # Extract detail constraint:
-        cdef str detail_constraint = item_selector.partition("[")[2].strip()
-        if detail_constraint.endswith("]"):
-            detail_constraint = detail_constraint[:-1].strip()
-        if len(detail_constraint) > 0:
-            self.detail_constraint = detail_constraint
+        cdef str attribute_constraints = item_selector.partition("[")[2].strip()
+        if attribute_constraints.endswith("]"):
+            attribute_constraints = attribute_constraints[:-1].strip()
+        if len(attribute_constraints) > 0:
+            self.attribute_constraints = attribute_constraints
         item_selector = item_selector.partition("[")[0].strip()
 
         # Extract name/tag, id and classes constraints:
@@ -263,6 +277,40 @@ cdef class CSSSelectorItem:
         if len(selector_item_classes) > 0:
             self.classes_constraint = selector_item_classes
 
+    def extract_colon_selectors(self, item_selector_string):
+        def get_last_relevant_colon(s):
+            nesting_depth = 0
+            i = len(s) - 1
+            while i >= 0:
+                if s[i] in {"]", "}", ")"}:
+                    nesting_depth += 1
+                elif s[i] in {"[", "{", "("}:
+                    nesting_depth = max(0, nesting_depth - 1)
+                elif nesting_depth == 0 and s[i] == ":":
+                    return i
+                i -= 1
+            return -1
+        def parse_colon_selector(colon_selector):
+            colon_selector_name = colon_selector.strip().\
+                partition("(")[0].partition("[")[0].lower()
+            if colon_selector_name in {
+                    "last-child", "first-child"
+                    }:
+                return CSSColonSpecialSelector(
+                    colon_selector_name
+                )
+            return CSSColonSpecialSelector("unknown")
+        result = []
+        colon_pos = get_last_relevant_colon(item_selector_string)
+        while colon_pos >= 0:
+            result = [parse_colon_selector(
+                item_selector_string[colon_pos + 1:]
+            )] + result
+            item_selector_string = \
+                item_selector_string[:colon_pos].strip()
+            colon_pos = get_last_relevant_colon(item_selector_string)
+        return (item_selector_string, result)
+
     def check_against(self,
                       list element_tag_names,
                       element_classes=[],
@@ -270,7 +318,8 @@ cdef class CSSSelectorItem:
                       get_following_sibling_info=None,
                       get_preceding_sibling_info=None,
                       ):
-        if self.detail_constraint is not None:
+        if self.attribute_constraints is not None and \
+                len(self.attribute_constraints) > 0:
             # We don't support these yet.
             return False
 

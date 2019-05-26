@@ -21,7 +21,9 @@ freely, subject to the following restrictions:
 cdef class CSSSelectorItem:
     cdef public str content
     cdef object tag_constraint, classes_constraint
-    cdef object id_constraint, detail_constraint
+    cdef object id_constraint
+    cdef list attribute_constraints
+    cdef public list colon_special_constraints
 
 
 cdef class CSSRulesetCollection:

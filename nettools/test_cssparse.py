@@ -103,9 +103,20 @@ def test_child_and_descendant_selectors():
 
 def test_css_selector_item_constructor():
     item = cssparse.CSSSelectorItem("#test")
+    assert(len(item.colon_special_constraints) == 0)
     assert(item.check_against(["foobar"], element_id="test"))
     assert(not item.check_against(["foobar"]))
     assert(not item.check_against(["foobar"], element_id="foobar"))
+    item = cssparse.CSSSelectorItem("#test:last-child")
+    assert(len(item.colon_special_constraints) == 1)
+    assert(not item.check_against(["whatever"],
+        element_id="test",
+        get_following_sibling_info=iter([("div",), ("p",)]).__next__,
+    ))
+    assert(item.check_against(["whatever"],
+        element_id="test",
+        get_following_sibling_info=iter([]).__next__,
+    ))
 
 
 def test_csstransform_parse_border():
