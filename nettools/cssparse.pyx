@@ -652,8 +652,10 @@ cdef class CSSRule:
             else:
                 while True:
                     try:
+                        if get_next_parent_info is None:
+                            raise StopIteration("no parent info to obtain")
                         parent = get_next_parent_info()
-                    except (StopIteration, ValueError, TypeError):
+                    except StopIteration:
                         parent = None
                     if parent is None:
                         return False
