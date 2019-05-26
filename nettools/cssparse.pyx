@@ -227,6 +227,79 @@ cdef class CSSColonSpecialSelector:
         self.name = name
         self.arguments = list(arguments)
 
+    def check_against(self,
+                      list element_tag_names,
+                      element_classes=[],
+                      element_id=None,
+                      get_following_sibling_info=None,
+                      get_preceding_sibling_info=None,
+                      ):
+        if SELECTOR_DEBUG:
+            print("nettools.cssparse.CSSColonSpecialSelector: "
+                  "DEBUG: check_against" +
+                  str((element_tag_names, element_id,
+                       element_classes)) +
+                  " with self.name='" + str(self.name) + "'"
+            )
+        if self.name == "unknown":
+            if SELECTOR_DEBUG:
+                print("nettools.cssparse.CSSColonSpecialSelector: "
+                      "DEBUG: check_against -> FALSE "
+                      "(unknown, cannot test this)")
+            return False
+        elif self.name == "first-child":
+            if get_preceding_sibling_info is None:
+                if SELECTOR_DEBUG:
+                    print("nettools.cssparse.CSSColonSpecialSelector: "
+                          "DEBUG: check_against -> FALSE: no preceding "
+                          "sibling info available")
+                return False
+            sibling_info = None
+            try:
+                sibling_info = get_preceding_sibling_info()
+            except StopIteration:
+                pass
+            if sibling_info is None:
+                if SELECTOR_DEBUG:
+                    print("nettools.cssparse.CSSColonSpecialSelector: "
+                          "DEBUG: check_against -> TRUE "
+                          "(no preceding sibling)")
+                return True
+            if SELECTOR_DEBUG:
+                print("nettools.cssparse.CSSColonSpecialSelector: "
+                      "DEBUG: check_against -> FALSE "
+                      "(got preceding sibling: " +
+                      str(sibling_info) + ")")
+            return False
+        elif self.name == "last-child":
+            if get_following_sibling_info is None:
+                if SELECTOR_DEBUG:
+                    print("nettools.cssparse.CSSColonSpecialSelector: "
+                          "DEBUG: check_against -> FALSE: no followup "
+                          "sibling info available")
+                return False
+            sibling_info = None
+            try:
+                sibling_info = get_following_sibling_info()
+            except StopIteration:
+                pass
+            if sibling_info is None:
+                if SELECTOR_DEBUG:
+                    print("nettools.cssparse.CSSColonSpecialSelector: "
+                          "DEBUG: check_against -> TRUE "
+                          "(no followup sibling)")
+                return True
+            if SELECTOR_DEBUG:
+                print("nettools.cssparse.CSSColonSpecialSelector: "
+                      "DEBUG: check_against -> FALSE "
+                      "(got followup sibling: " +
+                      str(sibling_info) + ")")
+            return False
+        else:
+            raise RuntimeError(
+                "invalid special selector: " + str(self.name)
+            )
+
 
 cdef class CSSSelectorItem:
     def __init__(self, str item_selector):
@@ -270,7 +343,8 @@ cdef class CSSSelectorItem:
         if selector_item_name.find("#") >= 0:
             selector_item_id = selector_item_name.rpartition("#")[2]
             selector_item_name = selector_item_name.rpartition("#")[0]
-        if len(selector_item_name.strip()) > 0:
+        if len(selector_item_name.strip()) > 0 and \
+                selector_item_name.strip() != "*":
             self.tag_constraint = selector_item_name.strip()
         if len(selector_item_id.strip()) > 0:
             self.id_constraint = selector_item_id.strip()
@@ -323,13 +397,33 @@ cdef class CSSSelectorItem:
             # We don't support these yet.
             return False
 
+        # Check special colon constraints:
+        for constraint in self.colon_special_constraints:
+            if not constraint.check_against(
+                    element_tag_names,
+                    element_classes=element_classes,
+                    element_id=element_id,
+                    get_following_sibling_info=\
+                        get_following_sibling_info,
+                    get_preceding_sibling_info=\
+                        get_preceding_sibling_info,
+                    ):
+                if SELECTOR_DEBUG:
+                    print("nettools.cssparse.CSSSelectorItem: " +
+                          "DEBUG: check_against" +
+                          str((self.content, element_tag_names,
+                               element_classes, element_id)) +
+                          " -> False (failed special constraint)"
+                    )
+                return False
+
         if self.content == "*":
             if SELECTOR_DEBUG:
                 print("nettools.cssparse.CSSSelectorItem: " +
                       "DEBUG: check_against" +
                       str((self.content, element_tag_names,
                            element_classes, element_id)) +
-                      " -> True"
+                      " -> True ('*' universal)"
                 )
             return True
 
@@ -341,7 +435,7 @@ cdef class CSSSelectorItem:
                       "DEBUG: check_against" +
                       str((self.content, element_tag_names,
                            element_classes, element_id)) +
-                      " -> False"
+                      " -> False (failed tag constraint)"
                 )
             return False
         if self.classes_constraint is not None:
@@ -353,7 +447,7 @@ cdef class CSSSelectorItem:
                           "DEBUG: check_against" +
                           str((self.content, element_tag_names,
                                element_classes, element_id)) +
-                          " -> False"
+                          " -> False (failed class constraint)"
                     )
                 return False
         if self.id_constraint is not None and \
@@ -363,7 +457,7 @@ cdef class CSSSelectorItem:
                       "DEBUG: check_against" +
                       str((self.content, element_tag_names,
                            element_classes, element_id)) +
-                      " -> False"
+                      " -> False (failed id constraint)"
                 )
             return False
         if SELECTOR_DEBUG:
@@ -371,7 +465,7 @@ cdef class CSSSelectorItem:
                   "DEBUG: check_against" +
                   str((self.content, element_tag_names,
                        element_classes, element_id)) +
-                  " -> True"
+                  " -> True (all constraints ok)"
             )
         return True
 
@@ -472,37 +566,16 @@ cdef class CSSRule:
         cdef tuple item_info
 
         if type(get_next_parent_info) == list:
-            _orig_list = get_next_parent_info
-            def iterator_func():
-                nonlocal _orig_list
-                if len(_orig_list) == 0:
-                    raise StopIteration("end of parents")
-                result = _orig_list[0]
-                _orig_list[:] = _orig_list[1:]
-                return result
-            get_next_parent_info = iterator_func
+            get_next_parent_info =\
+                iter(get_next_parent_info).__next__
 
         if type(get_following_sibling_info) == list:
-            _orig_list = get_following_sibling_info
-            def iterator_func():
-                nonlocal _orig_list
-                if len(_orig_list) == 0:
-                    raise StopIteration("end of preceding siblings")
-                result = _orig_list[0]
-                _orig_list[:] = _orig_list[1:]
-                return result
-            get_following_sibling_info = iterator_func
+            get_following_sibling_info =\
+                iter(get_following_sibling_info).__next__
 
         if type(get_preceding_sibling_info) == list:
-            _orig_list = get_preceding_sibling_info
-            def iterator_func():
-                nonlocal _orig_list
-                if len(_orig_list) == 0:
-                    raise StopIteration("end of followup siblings")
-                result = _orig_list[0]
-                _orig_list[:] = _orig_list[1:]
-                return result
-            get_preceding_sibling_info = iterator_func
+            get_preceding_sibling_info =\
+                iter(get_preceding_sibling_info).__next__
 
         cdef int require_direct_descendant = False
         cdef int i = len(self.selector.items) 
@@ -588,6 +661,11 @@ cdef class CSSRulesetCollection:
             int clear_out_none_values=True,
             list transform_funcs=[csstransform_parse_border],
             ):
+        if SELECTOR_DEBUG:
+            print("nettools.cssparse.CSSRulesetCollection."
+                  "get_item_attributes DEBUG args=" +
+                  str((item_name_str_or_name_list,
+                       item_classes, item_id)))
         cdef list item_names = []
         if type(item_name_str_or_name_list) == str:
             item_names.append(item_name_str_or_name_list)

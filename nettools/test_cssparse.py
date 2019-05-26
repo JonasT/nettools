@@ -107,6 +107,11 @@ def test_css_selector_item_constructor():
     assert(item.check_against(["foobar"], element_id="test"))
     assert(not item.check_against(["foobar"]))
     assert(not item.check_against(["foobar"], element_id="foobar"))
+
+
+def test_css_last_child_first_child():
+    cssparse.enable_selector_debugging()
+
     item = cssparse.CSSSelectorItem("#test:last-child")
     assert(len(item.colon_special_constraints) == 1)
     assert(not item.check_against(["whatever"],
@@ -117,6 +122,48 @@ def test_css_selector_item_constructor():
         element_id="test",
         get_following_sibling_info=iter([]).__next__,
     ))
+    item = cssparse.CSSSelectorItem("#test:first-child")
+    assert(len(item.colon_special_constraints) == 1)
+    assert(item.check_against(["whatever"],
+        element_id="test",
+        get_preceding_sibling_info=iter([]).__next__,
+        get_following_sibling_info=iter([("div",), ("p",)]).__next__,
+    ))
+    assert(not item.check_against(["whatever"],
+        element_id="test",
+        get_preceding_sibling_info=iter([("div",), ("p",)]).__next__,
+        get_following_sibling_info=iter([]).__next__,
+    ))
+    ruleset = cssparse.parse("""
+        div > *:first-child {color:red;}
+    """)
+    result = ruleset.get_item_attributes(
+        "span",
+        get_next_parent_info=[("div",), ("p",)],
+        get_preceding_sibling_info=[],
+        get_following_sibling_info=[("span",)],
+        nondirectional_can_override_directional=True,
+        transform_funcs=[cssparse.csstransform_parse_border],
+    )
+    assert("color" in result.attributes)
+    result = ruleset.get_item_attributes(
+        "span",
+        get_next_parent_info=[("p",), ("div",)],
+        get_preceding_sibling_info=[],
+        get_following_sibling_info=[("span",)],
+        nondirectional_can_override_directional=True,
+        transform_funcs=[cssparse.csstransform_parse_border],
+    )
+    assert("color" not in result.attributes)
+    result = ruleset.get_item_attributes(
+        "span",
+        get_next_parent_info=[("div",), ("p",)],
+        get_preceding_sibling_info=[("span",)],
+        get_following_sibling_info=[("span",)],
+        nondirectional_can_override_directional=True,
+        transform_funcs=[cssparse.csstransform_parse_border],
+    )
+    assert("color" not in result.attributes)
 
 
 def test_csstransform_parse_border():
