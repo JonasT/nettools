@@ -166,6 +166,39 @@ def test_css_last_child_first_child():
     assert("color" not in result.attributes)
 
 
+def test_css_not_special_selector():
+    ruleset = cssparse.parse("""
+        div > *:not(:first-child) {color:red;}
+    """)
+    result = ruleset.get_item_attributes(
+        "span",
+        get_next_parent_info=[("div",), ("p",)],
+        get_preceding_sibling_info=[],
+        get_following_sibling_info=[("span",)],
+        nondirectional_can_override_directional=True,
+        transform_funcs=[cssparse.csstransform_parse_border],
+    )
+    assert("color" not in result.attributes)
+    result = ruleset.get_item_attributes(
+        "span",
+        get_next_parent_info=[("div",), ("p",)],
+        get_preceding_sibling_info=[("span",)],
+        get_following_sibling_info=[("span",)],
+        nondirectional_can_override_directional=True,
+        transform_funcs=[cssparse.csstransform_parse_border],
+    )
+    assert("color" in result.attributes)
+    result = ruleset.get_item_attributes(
+        "span",
+        get_next_parent_info=[("p",), ("div",)],
+        get_preceding_sibling_info=[("span",)],
+        get_following_sibling_info=[("span",)],
+        nondirectional_can_override_directional=True,
+        transform_funcs=[cssparse.csstransform_parse_border],
+    )
+    assert("color" not in result.attributes)
+
+
 def test_csstransform_parse_border():
     result = cssparse.parse("""
         * {border-style:dotted;}

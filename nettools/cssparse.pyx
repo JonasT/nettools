@@ -227,6 +227,13 @@ cdef class CSSColonSpecialSelector:
         self.name = name
         self.arguments = list(arguments)
 
+    def __repr__(self):
+        return (
+            "<nettools.cssparse.CSSColonSpecialSelector name='" +
+            str(self.name).replace("'", "'\"'\"'") +
+            "' id=" + str(id(self)) + ">"
+        )
+
     def check_against(self,
                       list element_tag_names,
                       element_classes=[],
@@ -247,6 +254,36 @@ cdef class CSSColonSpecialSelector:
                       "DEBUG: check_against -> FALSE "
                       "(unknown, cannot test this)")
             return False
+        elif self.name == "not":
+            if len(self.arguments) == 0:
+                if SELECTOR_DEBUG:
+                    print("nettools.cssparse.CSSColonSpecialSelector: "
+                          "DEBUG: check_against -> FALSE: no contained "
+                          "selector to invert")
+                return False
+            contained_selector = self.arguments[0]
+            if SELECTOR_DEBUG:
+                print("nettools.cssparse.CSSColonSpecialSelector: "
+                      "DEBUG: check_against -> checking inner...")
+            value = self.arguments[0].check_against(
+                element_tag_names,
+                element_classes=element_classes,
+                element_id=element_id,
+                get_following_sibling_info=get_following_sibling_info,
+                get_preceding_sibling_info=get_preceding_sibling_info,
+            )
+            if value:
+                if SELECTOR_DEBUG:
+                    print("nettools.cssparse.CSSColonSpecialSelector: "
+                          "DEBUG: check_against -> :not result: FALSE "
+                          "(inner is True)")
+                return False
+            else:
+                if SELECTOR_DEBUG:
+                    print("nettools.cssparse.CSSColonSpecialSelector: "
+                          "DEBUG: check_against -> :not result: TRUE "
+                          "(inner is False)")
+                return True
         elif self.name == "first-child":
             if get_preceding_sibling_info is None:
                 if SELECTOR_DEBUG:
@@ -368,11 +405,24 @@ cdef class CSSSelectorItem:
             colon_selector_name = colon_selector.strip().\
                 partition("(")[0].partition("[")[0].lower()
             if colon_selector_name in {
-                    "last-child", "first-child"
+                    "last-child", "first-child",
                     }:
                 return CSSColonSpecialSelector(
                     colon_selector_name
                 )
+            elif colon_selector_name == "not":
+                contained_info = colon_selector.partition("not")[2].strip()
+                if contained_info.startswith("("):
+                    contained_info = contained_info[1:].strip()
+                    if contained_info.endswith(")"):
+                        contained_info = contained_info[:-1].strip()
+                    print("CONTAINED INFO -->" + str(contained_info) + "<--")
+                    (_unused_, contained_selectors) =\
+                        self.extract_colon_selectors(contained_info)
+                    print("inner selectors: " + str(contained_selectors))
+                    return CSSColonSpecialSelector(
+                        "not", arguments=contained_selectors
+                    )
             return CSSColonSpecialSelector("unknown")
         result = []
         colon_pos = get_last_relevant_colon(item_selector_string)
