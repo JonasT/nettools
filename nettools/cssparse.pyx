@@ -416,10 +416,8 @@ cdef class CSSSelectorItem:
                     contained_info = contained_info[1:].strip()
                     if contained_info.endswith(")"):
                         contained_info = contained_info[:-1].strip()
-                    print("CONTAINED INFO -->" + str(contained_info) + "<--")
                     (_unused_, contained_selectors) =\
                         self.extract_colon_selectors(contained_info)
-                    print("inner selectors: " + str(contained_selectors))
                     return CSSColonSpecialSelector(
                         "not", arguments=contained_selectors
                     )
