@@ -477,7 +477,9 @@ cdef class CSSSelectorItem:
 
         # Check all the constraints:
         if self.tag_constraint is not None and \
-                self.tag_constraint not in element_tag_names:
+                self.tag_constraint.lower() not in [
+                    tag.lower() for tag in element_tag_names
+                ]:
             if SELECTOR_DEBUG:
                 print("nettools.cssparse.CSSSelectorItem: " +
                       "DEBUG: check_against" +
