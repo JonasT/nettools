@@ -575,6 +575,54 @@ cdef class CSSSelector:
         )
 
 
+cdef class IteratorNextFuncWithRevert:
+    cdef object func
+    cdef int yield_offset
+    cdef list previous_encountered_values
+
+    def __init__(self, func):
+        initial_yield_offset = 0
+        initial_encountered_values = []
+        if func is None:
+            func = iter([]).__next__
+        if type(func) in {tuple, list}:
+            func = iter(func).__next__
+        if type(func) == type(self):
+            (func, initial_yield_offset,
+             initial_encountered_values) = func._values_for_copy()
+        self.func = func
+        self.previous_encountered_values = list(
+            initial_encountered_values
+        )
+        self.yield_offset = initial_yield_offset
+
+    def _values_for_copy(self):
+        return (
+            self.func, self.yield_offset,
+            self.previous_encountered_values,
+        )
+
+    def revert(self):
+        self.yield_offset = 0
+
+    def __call__(self):
+        if self.yield_offset < len(self.previous_encountered_values):
+            value = self.previous_encountered_values[self.yield_offset - 1]
+            self.yield_offset += 1
+            return value
+        value = None
+        try:
+            value = self.func()
+        except StopIteration:
+            pass
+        if value is not None:
+            self.previous_encountered_values.append(value)
+            self.yield_offset += 1
+        else:
+            raise StopIteration()
+        return value
+
+
 cdef class CSSRule:
     cdef public CSSSelector selector
     cdef public list attributes
@@ -615,17 +663,15 @@ cdef class CSSRule:
         cdef int first_item = True
         cdef tuple item_info
 
-        if type(get_next_parent_info) == list:
-            get_next_parent_info =\
-                iter(get_next_parent_info).__next__
-
-        if type(get_following_sibling_info) == list:
-            get_following_sibling_info =\
-                iter(get_following_sibling_info).__next__
-
-        if type(get_preceding_sibling_info) == list:
-            get_preceding_sibling_info =\
-                iter(get_preceding_sibling_info).__next__
+        get_next_parent_info = IteratorNextFuncWithRevert(
+            get_next_parent_info
+        )
+        get_following_sibling_info = IteratorNextFuncWithRevert(
+            get_following_sibling_info
+        )
+        get_preceding_sibling_info = IteratorNextFuncWithRevert(
+            get_preceding_sibling_info
+        )
 
         cdef int require_direct_descendant = False
         cdef int i = len(self.selector.items) 
@@ -634,6 +680,8 @@ cdef class CSSRule:
             if first_item:
                 first_item = False
                 item_info = (item_names, item_classes, item_id)
+                get_following_sibling_info.revert()
+                get_preceding_sibling_info.revert()
                 if not self.selector.check_item(
                         self.selector.items[i],
                         item_names,
@@ -652,8 +700,6 @@ cdef class CSSRule:
             else:
                 while True:
                     try:
-                        if get_next_parent_info is None:
-                            raise StopIteration("no parent info to obtain")
                         parent = get_next_parent_info()
                     except StopIteration:
                         parent = None
@@ -666,6 +712,8 @@ cdef class CSSRule:
                     ]
                     if type(parent_info[0]) == str:
                         parent_info[0] = [parent_info[0]]
+                    get_following_sibling_info.revert()
+                    get_preceding_sibling_info.revert()
                     if not self.selector.check_item(
                             self.selector.items[i],
                             parent_info[0],
@@ -718,6 +766,18 @@ cdef class CSSRulesetCollection:
                   "get_item_attributes DEBUG args=" +
                   str((item_name_str_or_name_list,
                        item_classes, item_id)))
+
+        get_next_parent_info = IteratorNextFuncWithRevert(
+            get_next_parent_info
+        )
+        get_following_sibling_info = IteratorNextFuncWithRevert(
+            get_following_sibling_info
+        )
+        get_preceding_sibling_info = IteratorNextFuncWithRevert(
+            get_preceding_sibling_info
+        )
+
+
         cdef list item_names = []
         if type(item_name_str_or_name_list) == str:
             item_names.append(item_name_str_or_name_list)
@@ -731,6 +791,9 @@ cdef class CSSRulesetCollection:
             rule_id += 1
             if rule.occurrence_order < 0:
                 rule.occurrence_order = rule_id
+            get_next_parent_info.revert()
+            get_following_sibling_info.revert()
+            get_preceding_sibling_info.revert()
             if rule.applies_to_item(item_names, item_classes, item_id,
                                     get_next_parent_info=
                                         get_next_parent_info,
