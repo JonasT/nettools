@@ -292,6 +292,7 @@ cdef class CSSColonSpecialSelector:
                           "sibling info available")
                 return False
             sibling_info = None
+            get_preceding_sibling_info.revert()
             try:
                 sibling_info = get_preceding_sibling_info()
             except StopIteration:
@@ -316,6 +317,7 @@ cdef class CSSColonSpecialSelector:
                           "sibling info available")
                 return False
             sibling_info = None
+            get_following_sibling_info.revert()
             try:
                 sibling_info = get_following_sibling_info()
             except StopIteration:
@@ -564,6 +566,12 @@ cdef class CSSSelector:
                    ):
         if type(item_selector) == str:
             item_selector = CSSSelectorItem(item_selector)
+        get_following_sibling_info = IteratorNextFuncWithRevert(
+            get_following_sibling_info
+        )
+        get_preceding_sibling_info = IteratorNextFuncWithRevert(
+            get_preceding_sibling_info
+        )
         return item_selector.check_against(
             item_names,
             element_classes=item_classes,
@@ -575,39 +583,35 @@ cdef class CSSSelector:
         )
 
 
-cdef class IteratorNextFuncWithRevert:
-    cdef object func
-    cdef int yield_offset
-    cdef list previous_encountered_values
-
+class IteratorNextFuncWithRevert:
     def __init__(self, func):
-        initial_yield_offset = 0
-        initial_encountered_values = []
+        if hasattr(self, "func") and self.func is not None:
+            return  # __init__ called twice because __new__ is weird. ignore.
         if func is None:
             func = iter([]).__next__
         if type(func) in {tuple, list}:
             func = iter(func).__next__
         if type(func) == type(self):
-            (func, initial_yield_offset,
-             initial_encountered_values) = func._values_for_copy()
+            raise ValueError("cannot wrap twice in "
+                            "IteratorNextFuncWithRevert")
         self.func = func
-        self.previous_encountered_values = list(
-            initial_encountered_values
-        )
-        self.yield_offset = initial_yield_offset
+        self.previous_encountered_values = []
+        self.yield_offset = 0
 
-    def _values_for_copy(self):
-        return (
-            self.func, self.yield_offset,
-            self.previous_encountered_values,
-        )
+    def __new__(cls, func):
+        if type(func) == cls:
+            return func
+        assert(not hasattr(func, "revert"))
+        return super().__new__(cls)  # arg 'func' passed by python later
 
     def revert(self):
+        if self.yield_offset == 0:
+            return
         self.yield_offset = 0
 
     def __call__(self):
         if self.yield_offset < len(self.previous_encountered_values):
-            value = self.previous_encountered_values[self.yield_offset - 1]
+            value = self.previous_encountered_values[self.yield_offset]
             self.yield_offset += 1
             return value
         value = None
