@@ -54,6 +54,12 @@ cdef class CSSAttribute:
             ":'" + str(self.value).replace("\\", "\\\\").\
             replace("'", "\\'") + "'>"
 
+    def serialize(self):
+        return (
+            str(self.name) + ":" +
+            str(self.value).replace("'", "&apos;")
+        )
+
     @classmethod
     def parse_from(cls, css_string):
         css_string = css_string.strip()
@@ -234,6 +240,22 @@ cdef class CSSColonSpecialSelector:
             "' id=" + str(id(self)) + ">"
         )
 
+    def serialize(self):
+        cdef str result
+        result = ":" + self.name
+        if len(self.arguments) > 0:
+            result += "("
+            is_first = True
+            for arg in self.arguments:
+                if is_first:
+                    is_first = False
+                else:
+                    result += ","
+                if isinstance(arg, CSSColonSpecialSelector):
+                    result += arg.serialize()
+            result += ")"
+        return result
+
     def check_against(self,
                       list element_tag_names,
                       element_classes=[],
@@ -241,6 +263,12 @@ cdef class CSSColonSpecialSelector:
                       get_following_sibling_info=None,
                       get_preceding_sibling_info=None,
                       ):
+        get_following_sibling_info = IteratorNextFuncWithRevert(
+            get_following_sibling_info
+        )
+        get_preceding_sibling_info = IteratorNextFuncWithRevert(
+            get_preceding_sibling_info
+        )
         if SELECTOR_DEBUG:
             print("nettools.cssparse.CSSColonSpecialSelector: "
                   "DEBUG: check_against" +
@@ -389,6 +417,20 @@ cdef class CSSSelectorItem:
             self.id_constraint = selector_item_id.strip()
         if len(selector_item_classes) > 0:
             self.classes_constraint = selector_item_classes
+
+    def serialize(self):
+        if self.content.strip() in {">", "*"}:
+            return self.content.strip()
+        result = ""
+        if self.tag_constraint is not None:
+            result += self.tag_constraint
+        for class_name in (self.classes_constraint or []):
+            result += "." + str(class_name)
+        if len(self.id_constraint or "") > 0:
+            result += "#" + self.id_constraint
+        for special_constraint in (self.colon_special_constraints or []):
+            result += special_constraint.serialize()
+        return result
 
     def extract_colon_selectors(self, item_selector_string):
         def get_last_relevant_colon(s):
@@ -542,6 +584,15 @@ cdef class CSSSelector:
     def as_str_list(self):
         return [i.content for i in self.items]
 
+    def serialize(self):
+        cdef str result
+        result = ""
+        for item in self.items:
+            if len(result) > 0:
+                result += " "
+            result += item.serialize()
+        return result
+
     @property
     def specificity(self):
         return self._specificity
@@ -643,6 +694,15 @@ cdef class CSSRule:
             (" ".join(self.selector.as_str_list())).\
             replace("'", "'\"'\"'") +\
             "'/" + str(len(self.attributes)) + " attrs>"
+
+    def serialize(self):
+        if len(self.attributes) == 0:
+            return ""
+        result = self.selector.serialize() + " {\n"
+        for attr in self.attributes:
+            result += "    " + attr.serialize() + ";\n"
+        result += "}"
+        return result
 
     def trumps_other_rule(self, rule):
         return (self.get_sorting_id() > rule.get_sorting_id())
@@ -754,6 +814,17 @@ cdef class CSSRulesetCollection:
 
     def __repr__(self):
         return "<CSSRuleCollection" + str(self.rules) + ">"
+
+    def serialize(self):
+        cdef str result
+        result = ""
+        for rule in self.rules:
+            adds = rule.serialize().strip()
+            if len(adds) > 0:
+                if len(result) > 0:
+                    result += "\n"
+                result += adds
+        return result
 
     def get_item_attributes(self,
             object item_name_str_or_name_list,

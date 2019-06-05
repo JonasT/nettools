@@ -23,6 +23,7 @@ import os
 import sys
 sys.path = [os.path.abspath(os.path.join(
                             os.path.dirname(__file__), ".."))] + sys.path
+import textwrap
 
 import nettools.cssparse as cssparse
 
@@ -353,11 +354,26 @@ def test_complex_selector_scenarios():
     assert(attributes["padding"].value == "5px")
 
 
+def test_serialize():
+    result = cssparse.parse("""
+        * {padding-left:   5px }
+        body {padding:10px;}
+    """)
+    assert(result.serialize().strip() == textwrap.dedent("""\
+        * {
+            padding-left:5px;
+        }
+        body {
+            padding:10px;
+        }"""
+    ))
+
+
 def test_directional_fallback_to_nondirectional():
     cssparse.enable_selector_debugging()
 
     result = cssparse.parse("""
-        * {padding-left:5px}
+        * {padding-left:5px;}
         body {padding:10px;}
     """)
     attributes = result.get_item_attributes(
