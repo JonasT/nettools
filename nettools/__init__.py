@@ -25,6 +25,7 @@ import random
 import socket
 import time
 
+
 def is_metered():
     try:
         from jnius import autoclass
@@ -45,6 +46,7 @@ def is_metered():
             isConnectedOrConnecting():
         return True
     return False
+
 
 def dns_lookup(name, single_target=True):
     last_error = None
@@ -80,7 +82,9 @@ def dns_lookup(name, single_target=True):
         raise last_error
     return targets
 
+
 _contexts = dict()
+
 def get_tls_context(unsafe_legacy, system_certs, extra_chain_path):
     global _contexts
     settings_key = (unsafe_legacy, system_certs, extra_chain_path)
@@ -110,7 +114,8 @@ def get_tls_context(unsafe_legacy, system_certs, extra_chain_path):
     _contexts[settings_key] = client_context
     return client_context
 
-class SimpleTCPClient(object):
+
+class SimpleTCPClient:
     def __init__(self, host, port, tls_enabled=False,
             tls_support_unsafe_legacy=False,
             tls_use_system_certificates=True):
@@ -192,7 +197,7 @@ class SimpleTCPClient(object):
             self.close()
             import ssl
             if self.tls_enabled and isinstance(e, ssl.SSLError):
-                print("ERROR: Got ssl faillure, config info: " +
+                print("ERROR: Got ssl failure, config info: " +
                     str({"tls_extra_chain_path":
                         self.tls_extra_chain_path,
                         "tls_use_system_certificates":
@@ -254,6 +259,7 @@ class SimpleTCPClient(object):
             bytes_received += len(value)
             result += value
         return result
+
 
 def do_http_style_request(host, port,
         tls_enabled=False,
@@ -344,9 +350,9 @@ def do_http_style_request(host, port,
                     "receive", recv_current, recv_total)
     while True:
         line = client.readline(max_length=1024)
-        if len(line) > 0:
+        if len(line.strip()) > 0:
             if received_response is None:
-                received_response = line.split(b" ")
+                received_response = line.strip().split(b" ")
                 if len(received_response) > 3:
                     received_response = received_response[:2] +\
                         [b" ".join(received_response[2:])]
@@ -394,7 +400,11 @@ def do_http_style_request(host, port,
             return b""
         content = None
         if not read_state["chunked"]:
-            content = client.read(amount)
+            try:
+                content = client.read(amount)
+            except OSError:
+                # Ooops, got disconnected.
+                content = b""
             if read_state["content-size-left"] != None and \
                     len(content) < amount:
                 client.close()
@@ -501,7 +511,7 @@ def do_http_style_request(host, port,
                 result += c
             return result
 
-        def readlines(Self, hint=-1):
+        def readlines(self, hint=-1):
             lines = []
             bytes_read = 0
             while True:
@@ -563,7 +573,8 @@ def do_http_style_request(host, port,
         SimpleStreamObj())
     return result
 
-def get_request(url, user_agent="nettool/0.1"):
+
+def get_request(url, user_agent="nettools/0.1"):
     import urllib.parse
     url_result = urllib.parse.urlparse(url)
     host = url_result.hostname
@@ -591,4 +602,41 @@ def get_request(url, user_agent="nettool/0.1"):
         operations_timeout=10,
         auto_evaluate_chunked_encoding=True,
         auto_evaluate_content_size=True)
+    return (headers, file_obj)
 
+
+def post_request(url, data, user_agent="nettools/0.1",
+                 data_content_type=None):
+    import urllib.parse
+    data = b"" + data
+    url_result = urllib.parse.urlparse(url)
+    host = url_result.hostname
+    port = url_result.port
+    if port is None:
+        if url_result.scheme.lower() == "http":
+            port = 80
+        else:
+            port = 443
+    tls = (url_result.scheme.lower() != "http")
+    path = url_result.path
+    if len(path.strip()) == 0:
+        path = "/"
+    (headers, file_obj) = do_http_style_request(
+        host, int(port),
+        tls_enabled=tls,
+        send_headers=[
+            "POST " +
+                str(urllib.parse.quote(path)) +
+                " HTTP/1.1",
+            "Host: " + str(host),
+            "User-Agent: " + str(user_agent),
+            "Transfer-Encoding: identity",
+            "Accept-Encoding: identity",
+            "Content-Length: " + str(len(data))
+        ] + ([] if data_content_type is None else
+             ["Content-Type: " + str(data_content_type)]),
+        send_body=data,
+        operations_timeout=10,
+        auto_evaluate_chunked_encoding=True,
+        auto_evaluate_content_size=True)
+    return (headers, file_obj)
