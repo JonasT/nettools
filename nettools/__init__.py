@@ -574,6 +574,21 @@ def do_http_style_request(host, port,
     return result
 
 
+def extract_response_code_from_headers(headers):
+    response_code = None
+    if len(headers) > 0:
+        if headers[0].lower().startswith("http"):
+            headers_code = headers_code.partition(" ")[2].strip()
+            if ord(headers_code[0]) >= ord("0") and \
+                    ord(headers_code[0]) <= ord("9"):
+                try:
+                    headers_code = int(headers_code.partition(" ")[0])
+                except (ValueError, TypeError):
+                    headers_code = None
+            response_code = headers_code
+    return response_code
+
+
 def get_request(url, user_agent="nettools/0.1"):
     import urllib.parse
     url_result = urllib.parse.urlparse(url)
@@ -601,8 +616,10 @@ def get_request(url, user_agent="nettools/0.1"):
         send_body=b"",
         operations_timeout=10,
         auto_evaluate_chunked_encoding=True,
-        auto_evaluate_content_size=True)
-    return (headers, file_obj)
+        auto_evaluate_content_size=True
+    )
+    response_code = extract_response_code_from_headers(headers)
+    return (headers, file_obj, response_code)
 
 
 def post_request(url, data, user_agent="nettools/0.1",
@@ -639,4 +656,5 @@ def post_request(url, data, user_agent="nettools/0.1",
         operations_timeout=10,
         auto_evaluate_chunked_encoding=True,
         auto_evaluate_content_size=True)
-    return (headers, file_obj)
+    response_code = extract_response_code_from_headers(headers)
+    return (headers, file_obj, response_code)
