@@ -627,7 +627,10 @@ def post_request(url, data, user_agent="nettools/0.1",
     data = b"" + data
     url_result = urllib.parse.urlparse(url)
     host = url_result.hostname
-    port = url_result.port
+    try:
+        port = url_result.port
+    except ValueError:
+        port = None
     if port is None:
         if url_result.scheme.lower() == "http":
             port = 80
