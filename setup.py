@@ -1,6 +1,5 @@
-
 '''
-nettools - Copyright 2018-2019 python nettools team, see AUTHORS.md
+nettools - Copyright 2018-2020 python nettools team, see AUTHORS.md
 
 This software is provided 'as-is', without any express or implied
 warranty. In no event will the authors be held liable for any damages
@@ -26,6 +25,9 @@ if int(sys.version.split(".")[0]) < 3:
 import setuptools
 from setuptools import setup, Extension, Command
 from setuptools.command.build_ext import build_ext
+import subprocess
+import tempfile
+import textwrap
 import os
 
 
@@ -42,15 +44,37 @@ class cythonize_build_ext_hook(build_ext):
                 c_path = full_path.rpartition(".")[0] + ".c"
                 if os.path.exists(c_path):
                     os.remove(c_path)
-                cythonize(full_path,
-                    include_path=[os.path.join(os.path.dirname(
-                    os.path.abspath(__file__)), "src")],
-                    compiler_directives={
-                        'always_allow_keywords': True,
-                        'boundscheck': True,
-                        'language_level': 3,
-                    }
+                CYTHONIZE_CMD = textwrap.dedent("""\
+                    from Cython.Build import cythonize
+                    import sys
+                    cythonize(
+                        sys.argv[1],
+                        include_path=[sys.argv[2]],
+                        gdb_debug=False,
+                        compiler_directives={
+                            'always_allow_keywords': True,
+                            'boundscheck': True,
+                            'language_level': 3,
+                            'profile': False,
+                            'linetrace': False,
+                        }
+                    )"""
                 )
+                (fd, cythonize_script_path) = tempfile.mkstemp(
+                    suffix="wobblui-inst-cythonize-"
+                )
+                try:
+                    os.close(fd)
+                    with open(cythonize_script_path, "w") as f:
+                        f.write(CYTHONIZE_CMD)
+                    subprocess.check_output([
+                        sys.executable, cythonize_script_path,
+                        full_path,  # file path
+                        os.path.dirname(  # include dir
+                            os.path.abspath(__file__))
+                    ], cwd=os.path.dirname(os.path.abspath(__file__)))
+                finally:
+                    os.remove(cythonize_script_path)
         super().run()
 
 
