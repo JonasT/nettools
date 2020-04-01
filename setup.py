@@ -138,8 +138,8 @@ setuptools.setup(
     cmdclass={
         "build_ext": cythonize_build_ext_hook
     },
-    author="Jonas Thiem",
-    author_email="jonas@thiem.email",
+    author="Ellie / github.com/etc0de, et al",
+    author_email="etc0de@wobble.ninja",
     ext_modules=extensions(),
     description="A pure python, self-contained package " +
         "of net/web helpers for TCP, WebDAV, HTML/XML, ...",
@@ -151,7 +151,7 @@ setuptools.setup(
     install_requires=dependencies,
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/JonasT/nettools",
+    url="https://github.com/etc0de/nettools",
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
