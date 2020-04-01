@@ -4,5 +4,5 @@ Authors
 
 The python nettools package was developed by:
 
-- Jonas Thiem
+- Ellie (github.com/etc0de)
 
