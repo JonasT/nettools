@@ -48,6 +48,10 @@ def webdav_path_joiner(p1, p2):
     return p1 + p2
 
 def headers_value(headers, name):
+    try:
+        name = name.decode("utf-8", "replace")
+    except AttributeError:
+        pass
     def get_header_name(header):
         try:
             header = header.decode("utf-8", "replace")
@@ -56,6 +60,10 @@ def headers_value(headers, name):
         return str(header).partition(":")[0].lower()
     for header in headers:
         if get_header_name(header).lower() == name.lower():
+            try:
+                header = header.encode("utf-8", "replace")
+            except AttributeError:
+                pass
             return header.partition(b":")[2].lstrip()
     return None
 
@@ -593,28 +601,45 @@ class DAVLocation(object):
         headers = [verb.encode("utf-8", "replace") + b" " +
             fix_broken_urlquote(location) + b" HTTP/1.1"] + headers
         def get_header_name(header):
+            if header is None:
+                return None
             try:
                 header = header.decode("utf-8", "replace")
             except AttributeError:
                 pass
-            return header.partition(":")[0].lower()
+            if ":" not in header:
+                return None
+            return header.partition(":")[0].strip().lower().strip()
         def got_header(name):
+            try:
+                name = name.decode("utf-8", "replace")
+            except AttributeError:
+                pass
             for header in headers:
-                if get_header_name(header).lower() == name.lower():
+                if get_header_name(header) == name.lower():
                     return True
             return False
+        transfer_chunked = False
         if not got_header("User-Agent"):
             headers.append("User-Agent: " + str(self.user_agent))
         if not got_header("Content-Length") and len(body) > 0:
             headers.append("Content-Length: " + str(len(body)))
         if not got_header("Accept-Encoding"):
-            headers.append(b"Accept-Encoding: identity")
+            if not got_header(b"Transfer-Encoding") or \
+                    headers_value(headers, b"transfer-encoding").lower() in [
+                        "chunked"
+                    ]:
+                headers.append(b"Accept-Encoding: chunked")
         if not got_header("Connection"):
             headers.append(b"Connection: close")
         if not got_header(b"Accept"):
             headers.append(b"Accept: */*")
         if not got_header(b"Transfer-Encoding"):
-            headers.append(b"Transfer-Encoding: identity")
+            transfer_chunked = True
+            headers.append(b"Transfer-Encoding: chunked")
+        elif headers_value(headers, b"transfer-encoding").lower() in [
+                b"chunked"]:
+            transfer_chunked = True
         if not got_header(b"Host"):
             headers.append("Host: " + str(self.host))
         if not got_header(b"Authorization") and (
@@ -629,12 +654,20 @@ class DAVLocation(object):
                 "all headers: " + str([(header if
                 str(header).lower().find("authorization") < 0 else
                 "<AUTHORIZATION HEADER HIDDEN>") for header in headers]))
+        if debug:
+            print("nettools.simpledav.DAVLocation.do_request: " +
+                "target: host: " + str(self.host) +
+                ", port: " + str(self.port) + ", tls: " + str(self.tls))
+        if debug:
+            print("nettools.simpledav.DAVLocation.do_request: " +
+                "send body: " + str(body))
         (response_headers, body_obj) = nettools.do_http_style_request(
             self.host, self.port,
             tls_enabled=self.tls,
             tls_extra_chain_path=self.tls_custom_chain_file,
             send_headers=headers, send_body=body,
             operations_timeout=10,
+            transfer_chunked=transfer_chunked,
             auto_evaluate_chunked_encoding=True,
             auto_evaluate_content_size=True,
             progress_callback=progress_callback)

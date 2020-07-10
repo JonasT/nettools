@@ -269,6 +269,7 @@ def do_http_style_request(host, port,
         tls_dont_use_system_certs_if_extra_chain=True,
         send_headers=[], send_body=b"",
         operations_timeout=10,
+        transfer_chunked=False,
         auto_evaluate_chunked_encoding=True,
         auto_evaluate_content_size=True,
         progress_callback=None):
@@ -317,17 +318,36 @@ def do_http_style_request(host, port,
                 content = content.encode("utf-8", "replace")
             except AttributeError:
                 pass
+            if transfer_chunked:
+                client.write(
+                    hex(len(content)).partition('x')[2].
+                        encode("utf-8") + b"\r\n"
+                )
             client.write(content)
+            if transfer_chunked:
+                client.write(b"\r\n")
             send_current += len(content)
             send_progress_update()
+        if transfer_chunked:
+            client.write(b"0\r\n\r\n")
     else:
         send_bytes = as_bytes(send_body)
         send_total = len(send_bytes)
         while len(send_bytes) > 0:
-            client.write(send_bytes[:chunk_size])
+            transfer_blob = send_bytes[:chunk_size]
+            if transfer_chunked:
+                client.write(
+                    hex(len(transfer_blob)).partition('x')[2].
+                        encode("utf-8") + b"\r\n"
+                )
+            client.write(transfer_blob)
+            if transfer_chunked:
+                client.write(b"\r\n")
             send_current += len(send_bytes[:chunk_size])
             send_bytes = send_bytes[chunk_size:]
             send_progress_update()
+        if transfer_chunked:
+            client.write(b"0\r\n\r\n")
 
     # Drop what we no longer need:
     del(send_body)
@@ -609,10 +629,11 @@ def get_request(url, user_agent="nettools/0.1"):
         str(urllib.parse.quote(path)) +
         " HTTP/1.1", "Host: " + str(host),
         "User-Agent: " + str(user_agent),
-        "Transfer-Encoding: identity",
-        "Accept-Encoding: identity",
+        "Transfer-Encoding: chunked",
+        "Accept-Encoding: chunked",
         "Content-Length: 0"],
         send_body=b"",
+        transfer_chunked=True,
         operations_timeout=10,
         auto_evaluate_chunked_encoding=True,
         auto_evaluate_content_size=True
@@ -649,13 +670,14 @@ def post_request(url, data, user_agent="nettools/0.1",
                 " HTTP/1.1",
             "Host: " + str(host),
             "User-Agent: " + str(user_agent),
-            "Transfer-Encoding: identity",
-            "Accept-Encoding: identity",
+            "Transfer-Encoding: chunked",
+            "Accept-Encoding: chunked",
             "Content-Length: " + str(len(data))
         ] + ([] if data_content_type is None else
              ["Content-Type: " + str(data_content_type)]),
         send_body=data,
         operations_timeout=10,
+        transfer_chunked=True,
         auto_evaluate_chunked_encoding=True,
         auto_evaluate_content_size=True)
     response_code = extract_response_code_from_headers(headers)
