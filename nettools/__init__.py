@@ -292,9 +292,18 @@ def do_http_style_request(host, port,
         except AttributeError:
             return v
     if len(send_headers) > 0:
-        client.write(b"\r\n".join(
-                [as_bytes(l) for l in send_headers]) +
-                b"\r\n\r\n")
+        cleaned_headers = [
+            header for header in send_headers
+            if not transfer_chunked or \
+            as_bytes(header).partition(b":")[0].
+                strip().lower() !=
+                b"content-length"
+        ]
+        client.write(
+            b"\r\n".join(
+                [as_bytes(l) for l in cleaned_headers]
+            ) + b"\r\n\r\n"
+        )
 
     # Send client body:
     chunk_size = 1024 * 4
