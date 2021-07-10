@@ -395,7 +395,7 @@ cdef int len_if_url(str text):
         elif text[k] != "%" and \
                 is_punctuation(text[k]) and \
                 text[k] != "." and text[k] != "/" and \
-                text[k] != "-":
+                text[k] != "-" and text[k] != "#":
             if not had_dot:
                 return -1
             if text[k] == "(" or text[k] == "[":
